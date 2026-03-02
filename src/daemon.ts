@@ -79,10 +79,23 @@ const commands = new Map<string, CommandDef>([
   ["eval", { needs: "page", run: (page, p) => evaluate(page, p.expression as string) }],
 
   ["pages", { needs: "browser", run: (browser) => listPages(browser) }],
-  ["new-page", { needs: "browser", run: (browser, p) => newPage(browser, p.url as string) }],
-  ["close-page", { needs: "browser", run: (browser, p) => closePage(browser, p.pageId as number) }],
-  ["select-page", { needs: "browser", run: async (browser, p) => {
-    await selectPage(browser, p.pageId as number);
+  ["new-page", { needs: "daemon", run: async (p) => {
+    const session = await getSession(p.port as number);
+    const page = await newPage(session.browser, p.url as string);
+    session.page = page;
+    return JSON.stringify({ url: page.url(), title: await page.title() });
+  }}],
+  ["close-page", { needs: "daemon", run: async (p) => {
+    const session = await getSession(p.port as number);
+    const result = await closePage(session.browser, p.pageId as number);
+    const pages = await session.browser.pages();
+    session.page = pages[0]!;
+    return result;
+  }}],
+  ["select-page", { needs: "daemon", run: async (p) => {
+    const session = await getSession(p.port as number);
+    const page = await selectPage(session.browser, p.pageId as number);
+    session.page = page;
     return JSON.stringify({ selected: p.pageId });
   }}],
 

@@ -15,12 +15,12 @@ export const listPages = async (browser: Browser): Promise<string> => {
 export const newPage = async (
   browser: Browser,
   url: string,
-): Promise<string> => {
+): Promise<Page> => {
   const page = await browser.newPage();
   if (url) {
     await page.goto(url, { waitUntil: "domcontentloaded" });
   }
-  return JSON.stringify({ url: page.url(), title: await page.title() });
+  return page;
 };
 
 export const closePage = async (
