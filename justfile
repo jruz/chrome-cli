@@ -12,6 +12,9 @@ chrome-launch-headed:
 ts-check:
     bun run tsc --noEmit
 
+ts-lint:
+    bun run eslint .
+
 ts-test:
     bun test
 
@@ -31,3 +34,4 @@ chrome-bench:
 
 check:
     just ts-check
+    just ts-lint
