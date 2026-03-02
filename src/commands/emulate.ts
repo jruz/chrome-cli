@@ -45,3 +45,12 @@ export const emulate = async (
 
   return JSON.stringify({ applied });
 };
+
+export const resizePage = async (
+  page: Page,
+  width: number,
+  height: number,
+): Promise<string> => {
+  await page.setViewport({ width, height });
+  return JSON.stringify({ resized: { width, height } });
+};

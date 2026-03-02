@@ -143,6 +143,28 @@ const cliCommands: CliCommand[] = [
     toPayload: (o) => ({ uid: o['uid'], file: o['file'] }),
   },
   {
+    name: "fill-form",
+    description: "Fill multiple form elements at once",
+    needsPort: true,
+    flags: [req("--fields <json>", "JSON array of {uid, value} objects")],
+    toPayload: (o) => {
+      const raw = o['fields'];
+      if (!raw) throw new Error("--fields is required");
+      try {
+        return { fields: JSON.parse(raw) };
+      } catch (err) {
+        throw new Error(`invalid JSON for --fields: ${String(err)}`, { cause: err });
+      }
+    },
+  },
+  {
+    name: "resize",
+    description: "Resize the page viewport",
+    needsPort: true,
+    flags: [req("--width <px>", "viewport width"), req("--height <px>", "viewport height")],
+    toPayload: (o) => ({ width: Number(o['width']), height: Number(o['height']) }),
+  },
+  {
     name: "eval",
     description: "Evaluate JavaScript in page context",
     needsPort: true,

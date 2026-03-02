@@ -121,6 +121,35 @@ export const drag = async (
   return JSON.stringify({ dragged: { from: fromUid, to: toUid } });
 };
 
+type FieldEntry = { uid: string; value: string };
+
+const isFieldEntry = (v: unknown): v is FieldEntry =>
+  typeof v === "object" && v !== null &&
+  "uid" in v && typeof v.uid === "string" &&
+  "value" in v && typeof v.value === "string";
+
+const fillOne = async (page: Page, field: FieldEntry) => {
+  const el = await findByUid(page, field.uid);
+  if (!el) throw new Error(`element not found: ${field.uid}`);
+  await el.click({ count: 3 });
+  await el.type(field.value);
+  return { uid: field.uid, value: field.value };
+};
+
+export const fillForm = async (
+  page: Page,
+  fields: unknown[],
+): Promise<string> => {
+  const validated = fields.map((field) => {
+    if (!isFieldEntry(field)) throw new Error(`invalid field entry: ${JSON.stringify(field)}`);
+    return field;
+  });
+
+  const results = await validated.reduce(
+    async (accP, field) => [...await accP, await fillOne(page, field)],
+    Promise.resolve(new Array<{ uid: string; value: string }>()),
+  );
+
   return JSON.stringify({ filled: results });
 };
 
@@ -131,8 +160,7 @@ export const uploadFile = async (
 ): Promise<string> => {
   const el = await findByUid(page, uid);
   if (!el) throw new Error(`element not found: ${uid}`);
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer uploadFile requires HTMLInputElement
-  const input = el as ElementHandle<HTMLInputElement>;
+  const input = await el.toElement("input");
   await input.uploadFile(filePath);
   return JSON.stringify({ uploaded: filePath, to: uid });
 };

@@ -55,6 +55,8 @@ chrome-cli type --port <port> --text <text> [--submit-key <key>]
 chrome-cli press --port <port> --key <key>
 chrome-cli drag --port <port> --from <uid> --to <uid>
 chrome-cli upload --port <port> --uid <uid> --file <path>
+chrome-cli fill-form --port <port> --fields '[{"uid":"1","value":"x"}]'
+chrome-cli resize --port <port> --width 1024 --height 768
 chrome-cli eval --port <port> --expression <code>
 chrome-cli pages --port <port>
 chrome-cli new-page --port <port> --url <url>

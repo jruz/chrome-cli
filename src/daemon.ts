@@ -5,10 +5,10 @@ import type { NetworkCapture } from "./commands/network";
 import type { ConsoleCapture } from "./commands/console";
 import { navigate, navigateBack, navigateForward, reload } from "./commands/navigate";
 import { snapshot, screenshot } from "./commands/snapshot";
-import { click, hover, fill, typeText, pressKey, drag, uploadFile } from "./commands/interact";
+import { click, hover, fill, fillForm, typeText, pressKey, drag, uploadFile } from "./commands/interact";
 import { evaluate } from "./commands/evaluate";
 import { listPages, newPage, closePage, selectPage } from "./commands/page";
-import { emulate } from "./commands/emulate";
+import { emulate, resizePage } from "./commands/emulate";
 import { waitFor, handleDialog } from "./commands/wait";
 import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance";
 import {
@@ -123,6 +123,11 @@ const commands = new Map<string, CommandDef>([
   ["press", { needs: "page", run: (page, p) => pressKey(page, str(p, "key")) }],
   ["drag", { needs: "page", run: (page, p) => drag(page, str(p, "from"), str(p, "to")) }],
   ["upload", { needs: "page", run: (page, p) => uploadFile(page, str(p, "uid"), str(p, "file")) }],
+  ["fill-form", { needs: "page", run: (page, p) => {
+    const fields = p['fields'];
+    if (!Array.isArray(fields)) throw new Error("param 'fields' must be an array");
+    return fillForm(page, fields);
+  }}],
 
   ["eval", { needs: "page", run: (page, p) => evaluate(page, str(p, "expression")) }],
 
@@ -148,6 +153,8 @@ const commands = new Map<string, CommandDef>([
     session.page = page;
     return JSON.stringify({ selected: num(p, "pageId") });
   }}],
+
+  ["resize", { needs: "page", run: (page, p) => resizePage(page, num(p, "width"), num(p, "height")) }],
 
   ["emulate", { needs: "page", run: (page, p) => {
     const cs = optStr(p, "colorScheme");
