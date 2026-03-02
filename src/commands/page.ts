@@ -15,10 +15,18 @@ export const listPages = async (browser: Browser): Promise<string> => {
 export const newPage = async (
   browser: Browser,
   url: string,
+  background: boolean,
+  isolatedContext: string | undefined,
 ): Promise<Page> => {
-  const page = await browser.newPage();
+  const context = isolatedContext
+    ? await browser.createBrowserContext()
+    : browser.defaultBrowserContext();
+  const page = await context.newPage();
   if (url) {
     await page.goto(url, { waitUntil: "domcontentloaded" });
+  }
+  if (!background) {
+    await page.bringToFront();
   }
   return page;
 };

@@ -141,8 +141,9 @@ const commands = new Map<string, CommandDef>([
   ["pages", { needs: "browser", run: (browser) => listPages(browser) }],
   ["new-page", { needs: "daemon", run: async (p) => {
     const session = await getSession(num(p, "port"));
-    const page = await newPage(session.browser, str(p, "url"));
-    session.page = page;
+    const bg = bool(p, "background");
+    const page = await newPage(session.browser, str(p, "url"), bg, optStr(p, "isolatedContext"));
+    if (!bg) session.page = page;
     return JSON.stringify({ url: page.url(), title: await page.title() });
   }}],
   ["close-page", { needs: "daemon", run: async (p) => {

@@ -194,8 +194,12 @@ const cliCommands: CliCommand[] = [
     name: "new-page",
     description: "Open a new page/tab",
     needsPort: true,
-    flags: [req("--url <url>", "URL to load")],
-    toPayload: (o) => ({ url: o['url'] }),
+    flags: [
+      req("--url <url>", "URL to load"),
+      opt("--background", "open without focusing"),
+      opt("--isolated-context <name>", "create page in isolated browser context"),
+    ],
+    toPayload: (o) => ({ url: o['url'], background: !!o['background'], isolatedContext: o['isolatedContext'] }),
   },
   {
     name: "close-page",

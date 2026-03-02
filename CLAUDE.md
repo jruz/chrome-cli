@@ -60,7 +60,7 @@ chrome-cli fill-form --port <port> --fields '[{"uid":"1","value":"x"}]'
 chrome-cli resize --port <port> --width 1024 --height 768
 chrome-cli eval --port <port> --expression <code>
 chrome-cli pages --port <port>
-chrome-cli new-page --port <port> --url <url>
+chrome-cli new-page --port <port> --url <url> [--background] [--isolated-context <name>]
 chrome-cli close-page --port <port> --page-id <id>
 chrome-cli select-page --port <port> --page-id <id>
 chrome-cli emulate --port <port> [--viewport WxH] [--user-agent <str>] [--geolocation lat,lng] [--color-scheme dark|light] [--cpu-throttling <rate>] [--network-conditions <preset>]
