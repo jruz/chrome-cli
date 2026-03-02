@@ -19,6 +19,7 @@ import {
 } from "./commands/network";
 import {
   startCapture as startConsoleCapture,
+  getEntry as getConsoleEntry,
   listEntries as listConsoleEntries,
   stopCapture as stopConsoleCapture,
 } from "./commands/console";
@@ -239,7 +240,13 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = consoleCaptures.get(port);
     if (!capture) throw new Error(`no active console capture on port ${port}`);
-    return listConsoleEntries(capture.entries, optStr(p, "type"));
+    return listConsoleEntries(capture, optStr(p, "type"), bool(p, "includePreserved"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
+  }}],
+  ["console-get", { needs: "daemon", run: (p) => {
+    const port = num(p, "port");
+    const capture = consoleCaptures.get(port);
+    if (!capture) throw new Error(`no active console capture on port ${port}`);
+    return getConsoleEntry(capture.entries, num(p, "msgid"));
   }}],
   ["console-stop", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");

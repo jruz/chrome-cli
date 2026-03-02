@@ -338,8 +338,25 @@ const cliCommands: CliCommand[] = [
     name: "console-list",
     description: "List captured console messages",
     needsPort: true,
-    flags: [opt("--type <type>", "filter by message type")],
-    toPayload: (o) => ({ type: o['type'] }),
+    flags: [
+      opt("--type <type>", "filter by message type"),
+      opt("--include-preserved", "include messages from last 3 navigations"),
+      opt("--page-size <n>", "results per page"),
+      opt("--page-idx <n>", "page number (0-based)"),
+    ],
+    toPayload: (o) => ({
+      type: o['type'],
+      includePreserved: !!o['includePreserved'],
+      pageSize: o['pageSize'] ? Number(o['pageSize']) : undefined,
+      pageIdx: o['pageIdx'] ? Number(o['pageIdx']) : undefined,
+    }),
+  },
+  {
+    name: "console-get",
+    description: "Get a single console message by index",
+    needsPort: true,
+    flags: [req("--msgid <id>", "message index")],
+    toPayload: (o) => ({ msgid: Number(o['msgid']) }),
   },
   {
     name: "console-stop",

@@ -71,7 +71,8 @@ chrome-cli network-list --port <port> [--type <type>] [--page-size <n>] [--page-
 chrome-cli network-get --port <port> --reqid <id> [--request-file <path>] [--response-file <path>]
 chrome-cli network-stop --port <port>
 chrome-cli console-start --port <port>
-chrome-cli console-list --port <port> [--type <type>]
+chrome-cli console-list --port <port> [--type <type>] [--include-preserved] [--page-size <n>] [--page-idx <n>]
+chrome-cli console-get --port <port> --msgid <id>
 chrome-cli console-stop --port <port>
 chrome-cli trace-start --port <port> [--path <file>]
 chrome-cli trace-stop --port <port> [--path <file>]
