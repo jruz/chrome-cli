@@ -3,4 +3,4 @@ rules = []
 files = []
 
 [ignore.by-rule]
-no-for-loop = ["bench.ts", "src/browser.ts", "src/daemon.ts"]
+no-for-loop = ["bench.ts", "src/browser.ts", "src/registry.ts"]
