@@ -266,14 +266,25 @@ const cliCommands: CliCommand[] = [
     name: "trace-start",
     description: "Start a performance trace",
     needsPort: true,
-    flags: [opt("--path <path>", "save trace to file")],
-    toPayload: (o) => ({ path: o['path'] }),
+    flags: [
+      opt("--path <path>", "save trace to file"),
+      opt("--reload", "reload page after starting trace"),
+      opt("--auto-stop", "stop trace after page loads"),
+    ],
+    toPayload: (o) => ({ path: o['path'], reload: !!o['reload'], autoStop: !!o['autoStop'] }),
   },
   {
     name: "trace-stop",
     description: "Stop the performance trace",
     needsPort: true,
     flags: [opt("--path <path>", "save trace to file")],
+    toPayload: (o) => ({ path: o['path'] }),
+  },
+  {
+    name: "trace-analyze",
+    description: "Analyze a trace file for performance insights",
+    needsPort: false,
+    flags: [req("--path <path>", "trace file to analyze")],
     toPayload: (o) => ({ path: o['path'] }),
   },
   {

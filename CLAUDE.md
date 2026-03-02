@@ -74,8 +74,9 @@ chrome-cli console-start --port <port>
 chrome-cli console-list --port <port> [--type <type>] [--include-preserved] [--page-size <n>] [--page-idx <n>]
 chrome-cli console-get --port <port> --msgid <id>
 chrome-cli console-stop --port <port>
-chrome-cli trace-start --port <port> [--path <file>]
+chrome-cli trace-start --port <port> [--path <file>] [--reload] [--auto-stop]
 chrome-cli trace-stop --port <port> [--path <file>]
+chrome-cli trace-analyze --path <file>
 chrome-cli heap-snapshot --port <port> --path <file>
 chrome-cli daemon-start
 chrome-cli daemon-status

@@ -10,7 +10,7 @@ import { evaluate } from "./commands/evaluate";
 import { listPages, newPage, closePage, selectPage } from "./commands/page";
 import { emulate, resizePage } from "./commands/emulate";
 import { waitFor, handleDialog } from "./commands/wait";
-import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance";
+import { startTrace, stopTrace, analyzeTrace, takeHeapSnapshot } from "./commands/performance";
 import {
   startCapture as startNetworkCapture,
   listEntries as listNetworkEntries,
@@ -195,8 +195,9 @@ const commands = new Map<string, CommandDef>([
     return handleDialog(page, action, optStr(p, "promptText"));
   }}],
 
-  ["trace-start", { needs: "page", run: (page, p) => startTrace(page, optStr(p, "path")) }],
+  ["trace-start", { needs: "page", run: (page, p) => startTrace(page, optStr(p, "path"), bool(p, "reload"), bool(p, "autoStop")) }],
   ["trace-stop", { needs: "page", run: (page, p) => stopTrace(page, optStr(p, "path")) }],
+  ["trace-analyze", { needs: "daemon", run: (p) => analyzeTrace(str(p, "path")) }],
   ["heap-snapshot", { needs: "page", run: (page, p) => takeHeapSnapshot(page, str(p, "path")) }],
 
   ["network-start", { needs: "daemon", run: async (p) => {
