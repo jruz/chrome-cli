@@ -50,18 +50,11 @@ const isPortFree = async (port: number): Promise<boolean> => {
 };
 
 const findFreePort = async (maxAttempts: number): Promise<number> => {
-  const candidates = Array.from({ length: maxAttempts }, () => 9222 + Math.floor(Math.random() * 1000));
-  const results = await candidates.reduce(
-    async (accP, candidate) => {
-      const found = await accP;
-      if (found) return found;
-      if (await isPortFree(candidate)) return candidate;
-      return null;
-    },
-    Promise.resolve(null as number | null),
-  );
-  if (!results) throw new Error(`failed to find free debug port after ${maxAttempts} attempts`);
-  return results;
+  for (let i = 0; i < maxAttempts; i++) {
+    const candidate = 9222 + Math.floor(Math.random() * 1000);
+    if (await isPortFree(candidate)) return candidate;
+  }
+  throw new Error(`failed to find free debug port after ${maxAttempts} attempts`);
 };
 
 export const launch = async (headless: boolean): Promise<{ port: number; userDataDir: string }> => {

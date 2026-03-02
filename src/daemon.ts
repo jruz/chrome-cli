@@ -273,20 +273,18 @@ const handleCommand = async (cmd: Command): Promise<string> => {
     }
 
     case "kill-all": {
-      const entries = Array.from(sessions.entries());
-      const killed = await Promise.all(
-        entries.map(async ([port, session]) => {
-          session.browser.disconnect();
-          if (session.userDataDir) {
-            try { rmSync(session.userDataDir, { recursive: true }); } catch { /* already gone */ }
-          }
-          const pid = await findChromePid(port);
-          if (pid) {
-            process.kill(pid, "SIGTERM");
-          }
-          return { port, pid };
-        }),
-      );
+      const killed: { port: number; pid: number | null }[] = [];
+      for (const [port, session] of sessions) {
+        session.browser.disconnect();
+        if (session.userDataDir) {
+          try { rmSync(session.userDataDir, { recursive: true }); } catch { /* already gone */ }
+        }
+        const pid = await findChromePid(port);
+        if (pid) {
+          process.kill(pid, "SIGTERM");
+        }
+        killed.push({ port, pid });
+      }
       sessions.clear();
       networkCaptures.clear();
       consoleCaptures.clear();
