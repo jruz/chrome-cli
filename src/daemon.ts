@@ -8,13 +8,15 @@ import { listPages, newPage, closePage, selectPage } from "./commands/page";
 import { emulate } from "./commands/emulate";
 import { waitFor, handleDialog } from "./commands/wait";
 import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance";
-import { startCapture, listEntries, stopCapture, type NetworkCapture } from "./commands/network";
+import { startCapture as startNetworkCapture, listEntries as listNetworkEntries, stopCapture as stopNetworkCapture, type NetworkCapture } from "./commands/network";
+import { startCapture as startConsoleCapture, listEntries as listConsoleEntries, stopCapture as stopConsoleCapture, type ConsoleCapture } from "./commands/console";
 import { unlinkSync } from "fs";
 
 const SOCKET_PATH = "/tmp/chrome-cli.sock";
 
 const sessions = new Map<number, Session>();
 const networkCaptures = new Map<number, NetworkCapture>();
+const consoleCaptures = new Map<number, ConsoleCapture>();
 
 const getSession = async (port: number): Promise<Session> => {
   const existing = sessions.get(port);
@@ -183,7 +185,7 @@ const handleCommand = async (cmd: Command): Promise<string> => {
         throw new Error(`network capture already active on port ${port}`);
       }
       const session = await getSession(port);
-      const capture = await startCapture(session.page);
+      const capture = await startNetworkCapture(session.page);
       networkCaptures.set(port, capture);
       return JSON.stringify({ capturing: true, port });
     }
@@ -194,7 +196,7 @@ const handleCommand = async (cmd: Command): Promise<string> => {
       if (!capture) {
         throw new Error(`no active network capture on port ${port}`);
       }
-      return listEntries(capture.entries, cmd.type as string | undefined);
+      return listNetworkEntries(capture.entries, cmd.type as string | undefined);
     }
 
     case "network-stop": {
@@ -203,8 +205,40 @@ const handleCommand = async (cmd: Command): Promise<string> => {
       if (!capture) {
         throw new Error(`no active network capture on port ${port}`);
       }
-      const result = await stopCapture(capture);
+      const result = await stopNetworkCapture(capture);
       networkCaptures.delete(port);
+      return result;
+    }
+
+    case "console-start": {
+      const port = cmd.port!;
+      if (consoleCaptures.has(port)) {
+        throw new Error(`console capture already active on port ${port}`);
+      }
+      const session = await getSession(port);
+      const capture = startConsoleCapture(session.page);
+      consoleCaptures.set(port, capture);
+      return JSON.stringify({ capturing: true, port });
+    }
+
+    case "console-list": {
+      const port = cmd.port!;
+      const capture = consoleCaptures.get(port);
+      if (!capture) {
+        throw new Error(`no active console capture on port ${port}`);
+      }
+      return listConsoleEntries(capture.entries, cmd.type as string | undefined);
+    }
+
+    case "console-stop": {
+      const port = cmd.port!;
+      const capture = consoleCaptures.get(port);
+      if (!capture) {
+        throw new Error(`no active console capture on port ${port}`);
+      }
+      const session = await getSession(port);
+      const result = stopConsoleCapture(session.page, capture);
+      consoleCaptures.delete(port);
       return result;
     }
 

@@ -91,6 +91,33 @@ program
     send({ action: "network-stop", port: Number(opts.port) })
   ));
 
+// --- Console ---
+
+program
+  .command("console-start")
+  .description("Start capturing console messages")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .action(run(async (opts) =>
+    send({ action: "console-start", port: Number(opts.port) })
+  ));
+
+program
+  .command("console-list")
+  .description("List captured console messages")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .option("--type <type>", "filter by message type (e.g. log, warn, error)")
+  .action(run(async (opts) =>
+    send({ action: "console-list", port: Number(opts.port), type: opts.type })
+  ));
+
+program
+  .command("console-stop")
+  .description("Stop capturing console messages")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .action(run(async (opts) =>
+    send({ action: "console-stop", port: Number(opts.port) })
+  ));
+
 // --- Navigation ---
 
 program
