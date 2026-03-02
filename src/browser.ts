@@ -24,6 +24,7 @@ export type Session = {
   browser: Browser;
   page: Page;
   port: number;
+  userDataDir: string;
 };
 
 const waitForDebugPort = async (port: number, timeoutMs: number): Promise<void> => {
@@ -39,8 +40,25 @@ const waitForDebugPort = async (port: number, timeoutMs: number): Promise<void> 
   throw new Error(`Chrome did not start on port ${port} within ${timeoutMs}ms`);
 };
 
-export const launch = async (headless: boolean): Promise<{ port: number }> => {
-  const port = 9222 + Math.floor(Math.random() * 1000);
+const isPortFree = async (port: number): Promise<boolean> => {
+  try {
+    await fetch(`http://127.0.0.1:${port}/json/version`);
+    return false;
+  } catch {
+    return true;
+  }
+};
+
+const findFreePort = async (maxAttempts: number): Promise<number> => {
+  for (let i = 0; i < maxAttempts; i++) {
+    const candidate = 9222 + Math.floor(Math.random() * 1000);
+    if (await isPortFree(candidate)) return candidate;
+  }
+  throw new Error(`failed to find free debug port after ${maxAttempts} attempts`);
+};
+
+export const launch = async (headless: boolean): Promise<{ port: number; userDataDir: string }> => {
+  const port = await findFreePort(10);
   const userDataDir = mkdtempSync(join(tmpdir(), "chrome-cli-"));
   const chromeArgs = [
     `--remote-debugging-port=${port}`,
@@ -58,15 +76,24 @@ export const launch = async (headless: boolean): Promise<{ port: number }> => {
 
   await waitForDebugPort(port, 10000);
 
-  return { port };
+  return { port, userDataDir };
 };
 
-export const connect = async (port: number): Promise<Session> => {
+export const isAlive = async (port: number): Promise<boolean> => {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
+export const connect = async (port: number, userDataDir: string): Promise<Session> => {
   const browser = await puppeteer.connect({
     browserURL: `http://127.0.0.1:${port}`,
   });
   const pages = await browser.pages();
   const first = pages[0];
   if (!first) throw new Error(`no pages found on port ${port}`);
-  return { browser, page: first, port };
+  return { browser, page: first, port, userDataDir };
 };

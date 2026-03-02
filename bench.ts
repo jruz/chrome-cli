@@ -85,7 +85,7 @@ const main = async () => {
 
   // --- Raw puppeteer (in-process) benchmarks ---
 
-  const session = await connect(port);
+  const session = await connect(port, "");
 
   results.push(stats("navigate", "raw-cdp", await timeOp(() => navigate(session.page, TARGET_URL, 30000))));
   results.push(stats("snapshot", "raw-cdp", await timeOp(() => snapshot(session.page))));

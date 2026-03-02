@@ -1,5 +1,5 @@
 import { log } from "./log";
-import { launch, connect, type Session } from "./browser";
+import { launch, connect, isAlive, type Session } from "./browser";
 import { navigate, navigateBack, navigateForward, reload } from "./commands/navigate";
 import { snapshot, screenshot } from "./commands/snapshot";
 import { click, hover, fill, typeText, pressKey, drag, uploadFile } from "./commands/interact";
@@ -10,7 +10,7 @@ import { waitFor, handleDialog } from "./commands/wait";
 import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance";
 import { startCapture as startNetworkCapture, listEntries as listNetworkEntries, stopCapture as stopNetworkCapture, type NetworkCapture } from "./commands/network";
 import { startCapture as startConsoleCapture, listEntries as listConsoleEntries, stopCapture as stopConsoleCapture, type ConsoleCapture } from "./commands/console";
-import { unlinkSync } from "fs";
+import { unlinkSync, rmSync } from "fs";
 
 const SOCKET_PATH = "/tmp/chrome-cli.sock";
 
@@ -20,8 +20,16 @@ const consoleCaptures = new Map<number, ConsoleCapture>();
 
 const getSession = async (port: number): Promise<Session> => {
   const existing = sessions.get(port);
-  if (existing) return existing;
-  const session = await connect(port);
+  if (existing) {
+    if (await isAlive(port)) return existing;
+    log.warn(`dead session on port ${port}, removing`);
+    existing.browser.disconnect();
+    sessions.delete(port);
+    networkCaptures.delete(port);
+    consoleCaptures.delete(port);
+    throw new Error(`Chrome on port ${port} is not responding, session removed`);
+  }
+  const session = await connect(port, "");
   sessions.set(port, session);
   return session;
 };
@@ -47,8 +55,8 @@ type Command = {
 const handleCommand = async (cmd: Command): Promise<string> => {
   switch (cmd.action) {
     case "launch": {
-      const { port } = await launch(!!cmd.headless);
-      const session = await connect(port);
+      const { port, userDataDir } = await launch(!!cmd.headless);
+      const session = await connect(port, userDataDir);
       sessions.set(port, session);
       return JSON.stringify({ port });
     }
@@ -247,7 +255,12 @@ const handleCommand = async (cmd: Command): Promise<string> => {
       const session = sessions.get(port);
       if (session) {
         session.browser.disconnect();
+        if (session.userDataDir) {
+          try { rmSync(session.userDataDir, { recursive: true }); } catch { /* already gone */ }
+        }
         sessions.delete(port);
+        networkCaptures.delete(port);
+        consoleCaptures.delete(port);
       }
       const pid = await findChromePid(port);
       if (pid) {
@@ -263,6 +276,9 @@ const handleCommand = async (cmd: Command): Promise<string> => {
       const killed: { port: number; pid: number | null }[] = [];
       for (const [port, session] of sessions) {
         session.browser.disconnect();
+        if (session.userDataDir) {
+          try { rmSync(session.userDataDir, { recursive: true }); } catch { /* already gone */ }
+        }
         const pid = await findChromePid(port);
         if (pid) {
           process.kill(pid, "SIGTERM");
@@ -270,6 +286,8 @@ const handleCommand = async (cmd: Command): Promise<string> => {
         killed.push({ port, pid });
       }
       sessions.clear();
+      networkCaptures.clear();
+      consoleCaptures.clear();
       return JSON.stringify({ killed });
     }
 
