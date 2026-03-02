@@ -97,3 +97,15 @@ export const connect = async (port: number, userDataDir: string): Promise<Sessio
   if (!first) throw new Error(`no pages found on port ${port}`);
   return { browser, page: first, port, userDataDir };
 };
+
+export const findChromePid = async (port: number): Promise<number | null> => {
+  const proc = Bun.spawn(["lsof", "-ti", `:${port}`], { stdout: "pipe", stderr: "pipe" });
+  const text = await new Response(proc.stdout).text();
+  const code = await proc.exited;
+  if (code !== 0) return null;
+  const firstLine = text.trim().split("\n")[0];
+  if (!firstLine) return null;
+  const pid = parseInt(firstLine, 10);
+  if (isNaN(pid)) return null;
+  return pid;
+};

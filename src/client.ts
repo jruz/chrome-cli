@@ -1,4 +1,4 @@
-const SOCKET_PATH = "/tmp/chrome-cli.sock";
+import { SOCKET_PATH } from "./config";
 
 export const send = async (command: Record<string, unknown>): Promise<string> => {
   const response = await fetch("http://localhost/command", {
