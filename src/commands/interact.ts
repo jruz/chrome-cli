@@ -1,4 +1,4 @@
-import type { Page, ElementHandle } from "puppeteer-core";
+import type { Page, ElementHandle, KeyInput } from "puppeteer-core";
 
 const findByUid = async (
   page: Page,
@@ -15,7 +15,10 @@ const findByUid = async (
       );
       let index = 0;
       while (walker.nextNode()) {
-        if (String(index) === nodeId) return walker.currentNode as Element;
+        if (String(index) === nodeId) {
+          const node = walker.currentNode;
+          if (node instanceof Element) return node;
+        }
         index++;
       }
       return null;
@@ -23,8 +26,8 @@ const findByUid = async (
     uid,
   );
 
-  const el = result.asElement() as ElementHandle<Element> | null;
-  return el;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- asElement returns Node but we filtered to Element via SHOW_ELEMENT
+  return result.asElement() as ElementHandle<Element> | null;
 };
 
 export const click = async (
@@ -68,7 +71,8 @@ export const typeText = async (
 ): Promise<string> => {
   await page.keyboard.type(text);
   if (submitKey) {
-    await page.keyboard.press(submitKey as any);
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer KeyInput is a closed union but we accept arbitrary key names
+    await page.keyboard.press(submitKey as KeyInput);
   }
   return JSON.stringify({ typed: text, submitKey });
 };
@@ -77,7 +81,8 @@ export const pressKey = async (
   page: Page,
   key: string,
 ): Promise<string> => {
-  await page.keyboard.press(key as any);
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer KeyInput is a closed union but we accept arbitrary key names
+  await page.keyboard.press(key as KeyInput);
   return JSON.stringify({ pressed: key });
 };
 
@@ -117,6 +122,7 @@ export const uploadFile = async (
 ): Promise<string> => {
   const el = await findByUid(page, uid);
   if (!el) throw new Error(`element not found: ${uid}`);
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer uploadFile requires HTMLInputElement
   const input = el as ElementHandle<HTMLInputElement>;
   await input.uploadFile(filePath);
   return JSON.stringify({ uploaded: filePath, to: uid });

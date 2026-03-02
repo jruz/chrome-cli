@@ -199,7 +199,11 @@ const cliCommands: CliCommand[] = [
     description: "Wait for text to appear on the page",
     needsPort: true,
     flags: [req("--text <texts>", "comma-separated texts"), req("--timeout <ms>", "max wait time")],
-    toPayload: (o) => ({ texts: (o.text as string).split(","), timeout: Number(o.timeout) }),
+    toPayload: (o) => {
+      const text = o.text;
+      if (!text) throw new Error("--text is required");
+      return { texts: text.split(","), timeout: Number(o.timeout) };
+    },
   },
   {
     name: "dialog",

@@ -1,5 +1,5 @@
 import { log } from "./src/log";
-import { connect, launch } from "./src/browser";
+import { connect } from "./src/browser";
 import { ensureDaemon, send } from "./src/client";
 import { navigate } from "./src/commands/navigate";
 import { snapshot } from "./src/commands/snapshot";
@@ -56,9 +56,9 @@ const main = async () => {
   const portStr = await send({ action: "launch", headless: true });
   let port: number;
   try {
-    const parsed = JSON.parse(portStr) as { port: number };
+    const parsed = JSON.parse(portStr);
     port = parsed.port;
-  } catch (err) {
+  } catch {
     log.error(`failed to parse launch response: ${portStr}`);
     process.exit(1);
   }

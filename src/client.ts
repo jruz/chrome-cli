@@ -6,16 +6,16 @@ export const send = async (command: Record<string, unknown>): Promise<string> =>
     unix: SOCKET_PATH,
     headers: { "content-type": "application/json" },
     body: JSON.stringify(command),
-  } as RequestInit);
+  });
 
   const text = await response.text();
 
   if (!response.ok) {
     try {
-      const parsed = JSON.parse(text) as { error: string };
+      const parsed = JSON.parse(text);
       throw new Error(parsed.error);
     } catch (err) {
-      if (err instanceof SyntaxError) throw new Error(text);
+      if (err instanceof SyntaxError) throw new Error(text, { cause: err });
       throw err;
     }
   }

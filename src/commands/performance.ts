@@ -19,7 +19,7 @@ export const stopTrace = async (
   const client = await page.createCDPSession();
 
   const chunks: string[] = [];
-  client.on("Tracing.dataCollected", (params: any) => {
+  client.on("Tracing.dataCollected", (params: { value: unknown[] }) => {
     chunks.push(JSON.stringify(params.value));
   });
 
@@ -43,7 +43,7 @@ export const takeHeapSnapshot = async (
   const client = await page.createCDPSession();
 
   const chunks: string[] = [];
-  client.on("HeapProfiler.addHeapSnapshotChunk", (params: any) => {
+  client.on("HeapProfiler.addHeapSnapshotChunk", (params: { chunk: string }) => {
     chunks.push(params.chunk);
   });
 

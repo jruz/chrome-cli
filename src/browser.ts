@@ -11,13 +11,14 @@ const CHROME_PATHS = {
 
 type Platform = keyof typeof CHROME_PATHS;
 
+const isPlatform = (p: string): p is Platform => p in CHROME_PATHS;
+
 const chromeExecutable = (): string => {
-  const platform = process.platform as Platform;
-  const path = CHROME_PATHS[platform];
-  if (!path) {
+  const platform = process.platform;
+  if (!isPlatform(platform)) {
     throw new Error(`unsupported platform: ${platform}`);
   }
-  return path;
+  return CHROME_PATHS[platform];
 };
 
 export type Session = {

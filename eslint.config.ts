@@ -6,7 +6,7 @@ export default tseslint.config(
   ...tseslint.configs.strict,
   {
     rules: {
-      "@typescript-eslint/consistent-type-assertions": ["warn", {
+      "@typescript-eslint/consistent-type-assertions": ["error", {
         assertionStyle: "never",
       }],
     },

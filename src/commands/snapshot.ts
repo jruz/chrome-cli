@@ -29,7 +29,10 @@ const buildTree = (
     ? node.childIds.map((id) => buildTree(nodeMap, id)).filter((n): n is AXTree => n !== null)
     : [];
 
-  if (node.ignored) return children.length === 1 ? children[0]! : { role: "group", name: "", uid: node.nodeId, children };
+  if (node.ignored) {
+    const [single] = children;
+    return children.length === 1 && single ? single : { role: "group", name: "", uid: node.nodeId, children };
+  }
 
   const role = node.role ? node.role.value : "none";
   const name = node.name ? node.name.value : "";
@@ -54,6 +57,7 @@ const formatTree = (tree: AXTree, depth: number): string => {
 
 export const snapshot = async (page: Page): Promise<string> => {
   const client = await page.createCDPSession();
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- CDP response type not fully typed by puppeteer
   const { nodes } = (await client.send("Accessibility.getFullAXTree")) as {
     nodes: RawAXNode[];
   };
