@@ -1,0 +1,45 @@
+import type { Page } from "puppeteer-core";
+
+type EmulateOptions = {
+  viewport?: { width: number; height: number };
+  userAgent?: string;
+  geolocation?: { latitude: number; longitude: number };
+  colorScheme?: "dark" | "light";
+};
+
+export const emulate = async (
+  page: Page,
+  options: EmulateOptions,
+): Promise<string> => {
+  const applied: string[] = [];
+
+  if (options.viewport) {
+    await page.setViewport(options.viewport);
+    applied.push("viewport");
+  }
+
+  if (options.userAgent) {
+    await page.setUserAgent(options.userAgent);
+    applied.push("userAgent");
+  }
+
+  if (options.geolocation) {
+    const client = await page.createCDPSession();
+    await client.send("Emulation.setGeolocationOverride", {
+      latitude: options.geolocation.latitude,
+      longitude: options.geolocation.longitude,
+      accuracy: 1,
+    });
+    await client.detach();
+    applied.push("geolocation");
+  }
+
+  if (options.colorScheme) {
+    await page.emulateMediaFeatures([
+      { name: "prefers-color-scheme", value: options.colorScheme },
+    ]);
+    applied.push("colorScheme");
+  }
+
+  return JSON.stringify({ applied });
+};
