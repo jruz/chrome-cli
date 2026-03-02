@@ -8,11 +8,13 @@ import { listPages, newPage, closePage, selectPage } from "./commands/page";
 import { emulate } from "./commands/emulate";
 import { waitFor, handleDialog } from "./commands/wait";
 import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance";
+import { startCapture, listEntries, stopCapture, type NetworkCapture } from "./commands/network";
 import { unlinkSync } from "fs";
 
 const SOCKET_PATH = "/tmp/chrome-cli.sock";
 
 const sessions = new Map<number, Session>();
+const networkCaptures = new Map<number, NetworkCapture>();
 
 const getSession = async (port: number): Promise<Session> => {
   const existing = sessions.get(port);
@@ -173,6 +175,37 @@ const handleCommand = async (cmd: Command): Promise<string> => {
     case "heap-snapshot": {
       const session = await getSession(cmd.port!);
       return takeHeapSnapshot(session.page, cmd.path as string);
+    }
+
+    case "network-start": {
+      const port = cmd.port!;
+      if (networkCaptures.has(port)) {
+        throw new Error(`network capture already active on port ${port}`);
+      }
+      const session = await getSession(port);
+      const capture = await startCapture(session.page);
+      networkCaptures.set(port, capture);
+      return JSON.stringify({ capturing: true, port });
+    }
+
+    case "network-list": {
+      const port = cmd.port!;
+      const capture = networkCaptures.get(port);
+      if (!capture) {
+        throw new Error(`no active network capture on port ${port}`);
+      }
+      return listEntries(capture.entries, cmd.type as string | undefined);
+    }
+
+    case "network-stop": {
+      const port = cmd.port!;
+      const capture = networkCaptures.get(port);
+      if (!capture) {
+        throw new Error(`no active network capture on port ${port}`);
+      }
+      const result = await stopCapture(capture);
+      networkCaptures.delete(port);
+      return result;
     }
 
     case "kill": {

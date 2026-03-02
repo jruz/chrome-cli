@@ -64,6 +64,33 @@ program
   .description("Kill all tracked Chrome instances")
   .action(run(async () => send({ action: "kill-all" })));
 
+// --- Network ---
+
+program
+  .command("network-start")
+  .description("Start capturing network requests")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .action(run(async (opts) =>
+    send({ action: "network-start", port: Number(opts.port) })
+  ));
+
+program
+  .command("network-list")
+  .description("List captured network requests")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .option("--type <type>", "filter by resource type (e.g. document, xhr, fetch, script)")
+  .action(run(async (opts) =>
+    send({ action: "network-list", port: Number(opts.port), type: opts.type })
+  ));
+
+program
+  .command("network-stop")
+  .description("Stop capturing network requests")
+  .requiredOption("--port <port>", "Chrome debug port")
+  .action(run(async (opts) =>
+    send({ action: "network-stop", port: Number(opts.port) })
+  ));
+
 // --- Navigation ---
 
 program
