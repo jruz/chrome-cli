@@ -294,8 +294,31 @@ const cliCommands: CliCommand[] = [
     name: "network-list",
     description: "List captured network requests",
     needsPort: true,
-    flags: [opt("--type <type>", "filter by resource type")],
-    toPayload: (o) => ({ type: o['type'] }),
+    flags: [
+      opt("--type <type>", "filter by resource type"),
+      opt("--page-size <n>", "results per page"),
+      opt("--page-idx <n>", "page number (0-based)"),
+    ],
+    toPayload: (o) => ({
+      type: o['type'],
+      pageSize: o['pageSize'] ? Number(o['pageSize']) : undefined,
+      pageIdx: o['pageIdx'] ? Number(o['pageIdx']) : undefined,
+    }),
+  },
+  {
+    name: "network-get",
+    description: "Get a single network request with full detail",
+    needsPort: true,
+    flags: [
+      req("--reqid <id>", "request index"),
+      opt("--request-file <path>", "save request body to file"),
+      opt("--response-file <path>", "save response body to file"),
+    ],
+    toPayload: (o) => ({
+      reqid: Number(o['reqid']),
+      requestFile: o['requestFile'],
+      responseFile: o['responseFile'],
+    }),
   },
   {
     name: "network-stop",

@@ -14,6 +14,7 @@ import { startTrace, stopTrace, takeHeapSnapshot } from "./commands/performance"
 import {
   startCapture as startNetworkCapture,
   listEntries as listNetworkEntries,
+  getEntry as getNetworkEntry,
   stopCapture as stopNetworkCapture,
 } from "./commands/network";
 import {
@@ -209,7 +210,13 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
-    return listNetworkEntries(capture.entries, optStr(p, "type"));
+    return listNetworkEntries(capture.entries, optStr(p, "type"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
+  }}],
+  ["network-get", { needs: "daemon", run: async (p) => {
+    const port = num(p, "port");
+    const capture = networkCaptures.get(port);
+    if (!capture) throw new Error(`no active network capture on port ${port}`);
+    return getNetworkEntry(capture, num(p, "reqid"), optStr(p, "requestFile"), optStr(p, "responseFile"));
   }}],
   ["network-stop", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");

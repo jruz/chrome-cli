@@ -67,7 +67,8 @@ chrome-cli emulate --port <port> [--viewport WxH] [--user-agent <str>] [--geoloc
 chrome-cli wait --port <port> --text <texts> --timeout <ms>
 chrome-cli dialog --port <port> --action accept|dismiss [--prompt-text <text>]
 chrome-cli network-start --port <port>
-chrome-cli network-list --port <port> [--type <type>]
+chrome-cli network-list --port <port> [--type <type>] [--page-size <n>] [--page-idx <n>]
+chrome-cli network-get --port <port> --reqid <id> [--request-file <path>] [--response-file <path>]
 chrome-cli network-stop --port <port>
 chrome-cli console-start --port <port>
 chrome-cli console-list --port <port> [--type <type>]
