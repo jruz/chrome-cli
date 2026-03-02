@@ -72,14 +72,15 @@ const shiftScore = (args: Record<string, unknown> | undefined): number => {
 };
 
 const extractInsights = (events: TraceEvent[]): Record<string, unknown> => {
-  const navigationStart = events.find((e) => e.name === "navigationStart")?.ts ?? 0;
-  const toMs = (ts: number) => Math.round((ts - navigationStart) / 1000 * 100) / 100;
+  const navEvent = events.find((e) => e.name === "navigationStart");
+  if (!navEvent) throw new Error("no navigationStart event found in trace");
+  const toMs = (ts: number) => Math.round((ts - navEvent.ts) / 1000 * 100) / 100;
 
   const fcp = events.find((e) => e.name === "firstContentfulPaint");
   const lcp = events.filter((e) => e.name === "largestContentfulPaint::Candidate").pop();
   const shifts = events.filter((e) => e.name === "LayoutShift");
   const cls = shifts.reduce((sum, e) => sum + shiftScore(e.args), 0);
-  const longTasks = events.filter((e) => e.name === "RunTask" && (e.dur ?? 0) > 50000);
+  const longTasks = events.filter((e) => e.name === "RunTask" && e.dur !== undefined && e.dur > 50000);
 
   return {
     firstContentfulPaint: fcp ? { ms: toMs(fcp.ts) } : null,

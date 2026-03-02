@@ -71,11 +71,11 @@ export const listEntries = (
     : all;
 
   if (pageSize === undefined) return JSON.stringify(filtered);
+  if (pageIdx === undefined) throw new Error("pageIdx is required when pageSize is set");
 
-  const idx = pageIdx ?? 0;
-  const start = idx * pageSize;
+  const start = pageIdx * pageSize;
   const page = filtered.slice(start, start + pageSize);
-  return JSON.stringify({ entries: page, total: filtered.length, pageIdx: idx, pageSize });
+  return JSON.stringify({ entries: page, total: filtered.length, pageIdx, pageSize });
 };
 
 export const stopCapture = (page: Page, capture: ConsoleCapture): string => {
