@@ -55,8 +55,8 @@ const cliCommands: CliCommand[] = [
     name: "navigate",
     description: "Navigate the current page to a URL",
     needsPort: true,
-    flags: [req("--url <url>", "target URL"), req("--timeout <ms>", "navigation timeout")],
-    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']) }),
+    flags: [req("--url <url>", "target URL"), req("--timeout <ms>", "navigation timeout"), opt("--init-script <code>", "JavaScript to inject before load")],
+    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']), initScript: o['initScript'] }),
   },
   {
     name: "back",
@@ -76,8 +76,8 @@ const cliCommands: CliCommand[] = [
     name: "reload",
     description: "Reload the current page",
     needsPort: true,
-    flags: [],
-    toPayload: () => ({}),
+    flags: [opt("--ignore-cache", "bypass cache on reload")],
+    toPayload: (o) => ({ ignoreCache: !!o['ignoreCache'] }),
   },
   {
     name: "snapshot",
@@ -220,12 +220,16 @@ const cliCommands: CliCommand[] = [
       opt("--user-agent <string>", "user agent string"),
       opt("--geolocation <lat,lng>", "geolocation"),
       opt("--color-scheme <scheme>", "dark or light"),
+      opt("--cpu-throttling <rate>", "CPU slowdown factor (1 to disable)"),
+      opt("--network-conditions <preset>", "Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G"),
     ],
     toPayload: (o) => ({
       viewport: o['viewport'] ? parseViewport(o['viewport']) : undefined,
       userAgent: o['userAgent'],
       geolocation: o['geolocation'] ? parseGeo(o['geolocation']) : undefined,
       colorScheme: o['colorScheme'],
+      cpuThrottlingRate: o['cpuThrottling'] ? Number(o['cpuThrottling']) : undefined,
+      networkConditions: o['networkConditions'],
     }),
   },
   {

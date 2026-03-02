@@ -44,8 +44,9 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 chrome-cli launch [--headed]
 chrome-cli kill --port <port>
 chrome-cli kill-all
-chrome-cli navigate --port <port> --url <url> --timeout <ms>
-chrome-cli back|forward|reload --port <port>
+chrome-cli navigate --port <port> --url <url> --timeout <ms> [--init-script <code>]
+chrome-cli back|forward --port <port>
+chrome-cli reload --port <port> [--ignore-cache]
 chrome-cli snapshot --port <port> [--verbose] [--path <file>]
 chrome-cli screenshot --port <port> [--path <file>] [--full-page] [--format png|jpeg|webp] [--quality <n>] [--uid <uid>]
 chrome-cli click --port <port> --uid <uid> [--dbl-click]
@@ -62,7 +63,7 @@ chrome-cli pages --port <port>
 chrome-cli new-page --port <port> --url <url>
 chrome-cli close-page --port <port> --page-id <id>
 chrome-cli select-page --port <port> --page-id <id>
-chrome-cli emulate --port <port> [--viewport WxH] [--user-agent <str>] [--geolocation lat,lng] [--color-scheme dark|light]
+chrome-cli emulate --port <port> [--viewport WxH] [--user-agent <str>] [--geolocation lat,lng] [--color-scheme dark|light] [--cpu-throttling <rate>] [--network-conditions <preset>]
 chrome-cli wait --port <port> --text <texts> --timeout <ms>
 chrome-cli dialog --port <port> --action accept|dismiss [--prompt-text <text>]
 chrome-cli network-start --port <port>

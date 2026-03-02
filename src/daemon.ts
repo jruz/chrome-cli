@@ -115,10 +115,10 @@ const commands = new Map<string, CommandDef>([
   ["status", { needs: "daemon", run: () => statusCmd(state) }],
   ["shutdown", { needs: "daemon", run: () => shutdownCmd(state) }],
 
-  ["navigate", { needs: "page", run: (page, p) => navigate(page, str(p, "url"), num(p, "timeout")) }],
+  ["navigate", { needs: "page", run: (page, p) => navigate(page, str(p, "url"), num(p, "timeout"), optStr(p, "initScript")) }],
   ["back", { needs: "page", run: (page) => navigateBack(page) }],
   ["forward", { needs: "page", run: (page) => navigateForward(page) }],
-  ["reload", { needs: "page", run: (page) => reload(page) }],
+  ["reload", { needs: "page", run: (page, p) => reload(page, bool(p, "ignoreCache")) }],
 
   ["snapshot", { needs: "page", run: (page, p) => snapshot(page, bool(p, "verbose"), optStr(p, "filePath")) }],
   ["screenshot", { needs: "page", run: (page, p) => screenshot(page, optStr(p, "path"), bool(p, "fullPage"), optStr(p, "format") ?? "png", optNum(p, "quality"), optStr(p, "uid")) }],
@@ -169,11 +169,15 @@ const commands = new Map<string, CommandDef>([
     const vp = p['viewport'];
     const geo = p['geolocation'];
     const ua = optStr(p, "userAgent");
+    const cpu = optNum(p, "cpuThrottlingRate");
+    const net = optStr(p, "networkConditions");
     return emulate(page, {
       ...(isViewport(vp) ? { viewport: vp } : {}),
       ...(ua !== undefined ? { userAgent: ua } : {}),
       ...(isGeo(geo) ? { geolocation: geo } : {}),
       ...(cs !== undefined ? { colorScheme: cs } : {}),
+      ...(cpu !== undefined ? { cpuThrottlingRate: cpu } : {}),
+      ...(net !== undefined ? { networkConditions: net } : {}),
     });
   }}],
 
