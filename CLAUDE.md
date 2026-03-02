@@ -46,8 +46,8 @@ chrome-cli kill --port <port>
 chrome-cli kill-all
 chrome-cli navigate --port <port> --url <url> --timeout <ms>
 chrome-cli back|forward|reload --port <port>
-chrome-cli snapshot --port <port>
-chrome-cli screenshot --port <port> [--path <file>] [--full-page]
+chrome-cli snapshot --port <port> [--verbose] [--path <file>]
+chrome-cli screenshot --port <port> [--path <file>] [--full-page] [--format png|jpeg|webp] [--quality <n>] [--uid <uid>]
 chrome-cli click --port <port> --uid <uid> [--dbl-click]
 chrome-cli hover --port <port> --uid <uid>
 chrome-cli fill --port <port> --uid <uid> --value <text>

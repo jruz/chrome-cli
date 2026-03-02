@@ -8,7 +8,7 @@ const toKeyInput = (key: string): KeyInput => {
   return key;
 };
 
-const findByUid = async (
+export const findByUid = async (
   page: Page,
   uid: string,
 ): Promise<ElementHandle | null> => {

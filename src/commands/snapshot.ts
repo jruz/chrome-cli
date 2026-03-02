@@ -1,5 +1,7 @@
 import type { Page } from "puppeteer-core";
+import { writeFile } from "fs/promises";
 import { z } from "zod";
+import { findByUid } from "./interact";
 
 const RawAXNodeSchema = z.object({
   nodeId: z.string(),
@@ -22,6 +24,7 @@ type AXTree = {
   name: string;
   uid: string;
   value?: string;
+  description?: string;
   children: AXTree[];
 };
 
@@ -45,25 +48,32 @@ const buildTree = (
   const name = node.name ? node.name.value : "";
 
   const val = node.value?.value;
+  const desc = node.description?.value;
   return {
     role,
     name,
     uid: node.nodeId,
     ...(val !== undefined ? { value: val } : {}),
+    ...(desc !== undefined ? { description: desc } : {}),
     children,
   };
 };
 
-const formatTree = (tree: AXTree, depth: number): string => {
+const formatTree = (tree: AXTree, depth: number, verbose: boolean): string => {
   const indent = "  ".repeat(depth);
   const value = tree.value ? ` value="${tree.value}"` : "";
-  const line = `${indent}${tree.role} "${tree.name}"${value} [uid=${tree.uid}]`;
+  const desc = verbose && tree.description ? ` description="${tree.description}"` : "";
+  const line = `${indent}${tree.role} "${tree.name}"${value}${desc} [uid=${tree.uid}]`;
   if (tree.children.length === 0) return line;
-  const children = tree.children.map((c) => formatTree(c, depth + 1));
+  const children = tree.children.map((c) => formatTree(c, depth + 1, verbose));
   return [line, ...children].join("\n");
 };
 
-export const snapshot = async (page: Page): Promise<string> => {
+export const snapshot = async (
+  page: Page,
+  verbose: boolean,
+  filePath: string | undefined,
+): Promise<string> => {
   const client = await page.createCDPSession();
   const { nodes } = AXTreeResponseSchema.parse(await client.send("Accessibility.getFullAXTree"));
   await client.detach();
@@ -75,19 +85,46 @@ export const snapshot = async (page: Page): Promise<string> => {
   const tree = buildTree(nodeMap, root.nodeId);
   if (!tree) return "empty page";
 
-  return formatTree(tree, 0);
+  const text = formatTree(tree, 0, verbose);
+
+  if (filePath) {
+    await writeFile(filePath, text);
+    return JSON.stringify({ saved: filePath });
+  }
+
+  return text;
 };
+
+type ScreenshotFormat = "png" | "jpeg" | "webp";
+
+const isScreenshotFormat = (v: string): v is ScreenshotFormat =>
+  v === "png" || v === "jpeg" || v === "webp";
 
 export const screenshot = async (
   page: Page,
   path: string | undefined,
   fullPage: boolean,
+  format: string,
+  quality: number | undefined,
+  uid: string | undefined,
 ): Promise<string> => {
-  const buffer = await page.screenshot({
+  if (!isScreenshotFormat(format)) throw new Error(`invalid format: ${format}`);
+
+  const opts = {
     ...(path !== undefined ? { path } : {}),
-    fullPage,
-    type: "png",
-  });
+    type: format,
+    ...(format !== "png" && quality !== undefined ? { quality } : {}),
+  };
+
+  if (uid) {
+    const el = await findByUid(page, uid);
+    if (!el) throw new Error(`element not found: ${uid}`);
+    const buffer = await el.screenshot(opts);
+    if (path) return JSON.stringify({ saved: path });
+    return Buffer.from(buffer).toString("base64");
+  }
+
+  const buffer = await page.screenshot({ ...opts, fullPage });
   if (path) return JSON.stringify({ saved: path });
   return Buffer.from(buffer).toString("base64");
 };
