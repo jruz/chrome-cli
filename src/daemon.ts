@@ -3,6 +3,7 @@ import { log } from "./log";
 import { isAlive, connect, type Session } from "./browser";
 import type { NetworkCapture } from "./commands/network";
 import type { ConsoleCapture } from "./commands/console";
+import type { TraceCapture } from "./commands/performance";
 import { navigate, navigateBack, navigateForward, reload } from "./commands/navigate";
 import { snapshot, screenshot } from "./commands/snapshot";
 import { click, hover, fill, fillForm, typeText, pressKey, drag, uploadFile } from "./commands/interact";
@@ -92,6 +93,7 @@ const isGeo = (v: unknown): v is Geo =>
 const sessions = new Map<number, Session>();
 const networkCaptures = new Map<number, NetworkCapture>();
 const consoleCaptures = new Map<number, ConsoleCapture>();
+const traceCaptures = new Map<number, TraceCapture>();
 const state: DaemonState = { sessions, networkCaptures, consoleCaptures };
 
 const getSession = async (port: number): Promise<Session> => {
@@ -195,8 +197,22 @@ const commands = new Map<string, CommandDef>([
     return handleDialog(page, action, optStr(p, "promptText"));
   }}],
 
-  ["trace-start", { needs: "page", run: (page, p) => startTrace(page, optStr(p, "path"), bool(p, "reload"), bool(p, "autoStop")) }],
-  ["trace-stop", { needs: "page", run: (page, p) => stopTrace(page, optStr(p, "path")) }],
+  ["trace-start", { needs: "daemon", run: async (p) => {
+    const port = num(p, "port");
+    if (traceCaptures.has(port)) throw new Error(`trace already active on port ${port}`);
+    const session = await getSession(port);
+    const { capture, result } = await startTrace(session.page, optStr(p, "path"), bool(p, "reload"), bool(p, "autoStop"));
+    if (!bool(p, "autoStop")) traceCaptures.set(port, capture);
+    return result;
+  }}],
+  ["trace-stop", { needs: "daemon", run: async (p) => {
+    const port = num(p, "port");
+    const capture = traceCaptures.get(port);
+    if (!capture) throw new Error(`no active trace on port ${port}`);
+    const result = await stopTrace(capture, optStr(p, "path"));
+    traceCaptures.delete(port);
+    return result;
+  }}],
   ["trace-analyze", { needs: "daemon", run: (p) => analyzeTrace(str(p, "path")) }],
   ["heap-snapshot", { needs: "page", run: (page, p) => takeHeapSnapshot(page, str(p, "path")) }],
 
