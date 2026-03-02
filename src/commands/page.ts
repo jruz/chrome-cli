@@ -29,7 +29,7 @@ export const closePage = async (
 ): Promise<string> => {
   const pages = await browser.pages();
   const target = pages[pageId];
-  if (!target) throw new Error(`page not found: ${pageId}`);
+  if (!target) throw new Error(`page not found: ${String(pageId)}`);
   if (pages.length <= 1) throw new Error("cannot close the last page");
   await target.close();
   return JSON.stringify({ closed: pageId });
@@ -41,7 +41,7 @@ export const selectPage = async (
 ): Promise<Page> => {
   const pages = await browser.pages();
   const target = pages[pageId];
-  if (!target) throw new Error(`page not found: ${pageId}`);
+  if (!target) throw new Error(`page not found: ${String(pageId)}`);
   await target.bringToFront();
   return target;
 };

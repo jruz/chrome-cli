@@ -17,17 +17,17 @@ export const launchCmd = async (state: DaemonState, headless: boolean): Promise<
   return JSON.stringify({ port });
 };
 
-const cleanupSession = (
+const cleanupSession = async (
   state: DaemonState,
   port: number,
   session: Session,
-): void => {
-  session.browser.disconnect();
+): Promise<void> => {
+  await session.browser.disconnect();
   if (session.userDataDir) {
     try {
       rmSync(session.userDataDir, { recursive: true });
     } catch (err) {
-      log.warn(`failed to remove user data dir: ${err}`);
+      log.warn(`failed to remove user data dir: ${String(err)}`);
     }
   }
   state.sessions.delete(port);
@@ -38,7 +38,7 @@ const cleanupSession = (
 export const killCmd = async (state: DaemonState, port: number): Promise<string> => {
   const session = state.sessions.get(port);
   const pid = await findChromePid(port);
-  if (session) cleanupSession(state, port, session);
+  if (session) await cleanupSession(state, port, session);
   if (pid) process.kill(pid, "SIGTERM");
   if (!session && !pid) throw new Error(`no Chrome found on port ${port}`);
   return JSON.stringify({ killed: port, pid });
@@ -49,7 +49,7 @@ export const killAllCmd = async (state: DaemonState): Promise<string> => {
   const killed = await Promise.all(
     entries.map(async ([port, session]) => {
       const pid = await findChromePid(port);
-      cleanupSession(state, port, session);
+      await cleanupSession(state, port, session);
       if (pid) process.kill(pid, "SIGTERM");
       return { port, pid };
     }),
@@ -57,7 +57,7 @@ export const killAllCmd = async (state: DaemonState): Promise<string> => {
   return JSON.stringify({ killed });
 };
 
-export const statusCmd = async (state: DaemonState): Promise<string> => {
+export const statusCmd = (state: DaemonState): string => {
   const ports = Array.from(state.sessions.keys());
   return JSON.stringify({ sessions: ports.length, ports });
 };
@@ -66,7 +66,7 @@ export const shutdownCmd = async (state: DaemonState): Promise<string> => {
   const entries = Array.from(state.sessions.entries());
   await Promise.all(
     entries.map(async ([port, session]) => {
-      cleanupSession(state, port, session);
+      await cleanupSession(state, port, session);
       const pid = await findChromePid(port);
       if (pid) process.kill(pid, "SIGTERM");
     }),

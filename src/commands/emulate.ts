@@ -19,7 +19,9 @@ export const emulate = async (
   }
 
   if (options.userAgent) {
-    await page.setUserAgent(options.userAgent);
+    const client = await page.createCDPSession();
+    await client.send("Emulation.setUserAgentOverride", { userAgent: options.userAgent });
+    await client.detach();
     applied.push("userAgent");
   }
 

@@ -1,13 +1,21 @@
 import type { Page, ElementHandle, KeyInput } from "puppeteer-core";
+import { _keyDefinitions } from "puppeteer-core/internal/common/USKeyboardLayout.js";
+
+const isKeyInput = (key: string): key is KeyInput => key in _keyDefinitions;
+
+const toKeyInput = (key: string): KeyInput => {
+  if (!isKeyInput(key)) throw new Error(`invalid key: ${key}`);
+  return key;
+};
 
 const findByUid = async (
   page: Page,
   uid: string,
-): Promise<ElementHandle<Element> | null> => {
+): Promise<ElementHandle | null> => {
   const element = await page.$(`[data-uid="${uid}"]`);
   if (element) return element;
 
-  const result = await page.evaluateHandle(
+  const found = await page.evaluate(
     (nodeId) => {
       const walker = document.createTreeWalker(
         document.body,
@@ -15,19 +23,19 @@ const findByUid = async (
       );
       let index = 0;
       while (walker.nextNode()) {
-        if (String(index) === nodeId) {
-          const node = walker.currentNode;
-          if (node instanceof Element) return node;
+        if (String(index) === nodeId && walker.currentNode instanceof Element) {
+          walker.currentNode.setAttribute("data-uid", nodeId);
+          return true;
         }
         index++;
       }
-      return null;
+      return false;
     },
     uid,
   );
 
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- asElement returns Node but we filtered to Element via SHOW_ELEMENT
-  return result.asElement() as ElementHandle<Element> | null;
+  if (!found) return null;
+  return page.$(`[data-uid="${uid}"]`);
 };
 
 export const click = async (
@@ -71,8 +79,7 @@ export const typeText = async (
 ): Promise<string> => {
   await page.keyboard.type(text);
   if (submitKey) {
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer KeyInput is a closed union but we accept arbitrary key names
-    await page.keyboard.press(submitKey as KeyInput);
+    await page.keyboard.press(toKeyInput(submitKey));
   }
   return JSON.stringify({ typed: text, submitKey });
 };
@@ -81,8 +88,7 @@ export const pressKey = async (
   page: Page,
   key: string,
 ): Promise<string> => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- puppeteer KeyInput is a closed union but we accept arbitrary key names
-  await page.keyboard.press(key as KeyInput);
+  await page.keyboard.press(toKeyInput(key));
   return JSON.stringify({ pressed: key });
 };
 
@@ -113,6 +119,9 @@ export const drag = async (
   await page.mouse.up();
 
   return JSON.stringify({ dragged: { from: fromUid, to: toUid } });
+};
+
+  return JSON.stringify({ filled: results });
 };
 
 export const uploadFile = async (

@@ -24,13 +24,18 @@ import {
 import { launchCmd, killCmd, killAllCmd, statusCmd, shutdownCmd, type DaemonState } from "./commands/lifecycle";
 import { SOCKET_PATH } from "./config";
 import { unlinkSync } from "fs";
+import { z } from "zod";
 
-type Params = Record<string, unknown>;
+const ParamsSchema = z.record(z.string(), z.unknown());
+
+type Params = z.infer<typeof ParamsSchema>;
+
+type CommandResult = Promise<string> | string;
 
 type CommandDef =
-  | { needs: "page"; run: (page: Page, p: Params) => Promise<string> }
-  | { needs: "browser"; run: (browser: Browser, p: Params) => Promise<string> }
-  | { needs: "daemon"; run: (p: Params) => Promise<string> };
+  | { needs: "page"; run: (page: Page, p: Params) => CommandResult }
+  | { needs: "browser"; run: (browser: Browser, p: Params) => CommandResult }
+  | { needs: "daemon"; run: (p: Params) => CommandResult };
 
 const str = (p: Params, key: string): string => {
   const v = p[key];
@@ -85,7 +90,7 @@ const getSession = async (port: number): Promise<Session> => {
   if (existing) {
     if (await isAlive(port)) return existing;
     log.warn(`dead session on port ${port}, removing`);
-    existing.browser.disconnect();
+    await existing.browser.disconnect();
     sessions.delete(port);
     networkCaptures.delete(port);
     consoleCaptures.delete(port);
@@ -147,11 +152,14 @@ const commands = new Map<string, CommandDef>([
   ["emulate", { needs: "page", run: (page, p) => {
     const cs = optStr(p, "colorScheme");
     if (cs !== undefined && cs !== "dark" && cs !== "light") throw new Error(`invalid colorScheme: ${cs}`);
+    const vp = p['viewport'];
+    const geo = p['geolocation'];
+    const ua = optStr(p, "userAgent");
     return emulate(page, {
-      viewport: isViewport(p.viewport) ? p.viewport : undefined,
-      userAgent: optStr(p, "userAgent"),
-      geolocation: isGeo(p.geolocation) ? p.geolocation : undefined,
-      colorScheme: cs,
+      ...(isViewport(vp) ? { viewport: vp } : {}),
+      ...(ua !== undefined ? { userAgent: ua } : {}),
+      ...(isGeo(geo) ? { geolocation: geo } : {}),
+      ...(cs !== undefined ? { colorScheme: cs } : {}),
     });
   }}],
 
@@ -174,7 +182,7 @@ const commands = new Map<string, CommandDef>([
     networkCaptures.set(port, capture);
     return JSON.stringify({ capturing: true, port });
   }}],
-  ["network-list", { needs: "daemon", run: async (p) => {
+  ["network-list", { needs: "daemon", run: (p) => {
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
@@ -197,7 +205,7 @@ const commands = new Map<string, CommandDef>([
     consoleCaptures.set(port, capture);
     return JSON.stringify({ capturing: true, port });
   }}],
-  ["console-list", { needs: "daemon", run: async (p) => {
+  ["console-list", { needs: "daemon", run: (p) => {
     const port = num(p, "port");
     const capture = consoleCaptures.get(port);
     if (!capture) throw new Error(`no active console capture on port ${port}`);
@@ -238,14 +246,15 @@ const start = () => {
   try {
     unlinkSync(SOCKET_PATH);
   } catch (err) {
-    log.warn(`failed to unlink socket: ${err}`);
+    log.warn(`failed to unlink socket: ${String(err)}`);
   }
 
   Bun.serve({
     unix: SOCKET_PATH,
     fetch: async (req) => {
       try {
-        const result = await dispatch(await req.json());
+        const body = ParamsSchema.parse(await req.json());
+        const result = await dispatch(body);
         return new Response(result, { headers: { "content-type": "application/json" } });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

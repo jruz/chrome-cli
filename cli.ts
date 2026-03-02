@@ -35,7 +35,7 @@ const cliCommands: CliCommand[] = [
     description: "Launch a new Chrome instance",
     needsPort: false,
     flags: [opt("--headed", "launch with visible window")],
-    toPayload: (o) => ({ headless: !o.headed }),
+    toPayload: (o) => ({ headless: !o['headed'] }),
   },
   {
     name: "kill",
@@ -56,7 +56,7 @@ const cliCommands: CliCommand[] = [
     description: "Navigate the current page to a URL",
     needsPort: true,
     flags: [req("--url <url>", "target URL"), req("--timeout <ms>", "navigation timeout")],
-    toPayload: (o) => ({ url: o.url, timeout: Number(o.timeout) }),
+    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']) }),
   },
   {
     name: "back",
@@ -91,63 +91,63 @@ const cliCommands: CliCommand[] = [
     description: "Take a screenshot (PNG)",
     needsPort: true,
     flags: [opt("--path <path>", "save to file"), opt("--full-page", "capture full page")],
-    toPayload: (o) => ({ path: o.path, fullPage: !!o.fullPage }),
+    toPayload: (o) => ({ path: o['path'], fullPage: !!o['fullPage'] }),
   },
   {
     name: "click",
     description: "Click an element by uid",
     needsPort: true,
     flags: [req("--uid <uid>", "element uid from snapshot"), opt("--dbl-click", "double click")],
-    toPayload: (o) => ({ uid: o.uid, dblClick: !!o.dblClick }),
+    toPayload: (o) => ({ uid: o['uid'], dblClick: !!o['dblClick'] }),
   },
   {
     name: "hover",
     description: "Hover over an element by uid",
     needsPort: true,
     flags: [req("--uid <uid>", "element uid from snapshot")],
-    toPayload: (o) => ({ uid: o.uid }),
+    toPayload: (o) => ({ uid: o['uid'] }),
   },
   {
     name: "fill",
     description: "Clear and type a value into an input",
     needsPort: true,
     flags: [req("--uid <uid>", "element uid"), req("--value <value>", "text to type")],
-    toPayload: (o) => ({ uid: o.uid, value: o.value }),
+    toPayload: (o) => ({ uid: o['uid'], value: o['value'] }),
   },
   {
     name: "type",
     description: "Type text into the focused element",
     needsPort: true,
     flags: [req("--text <text>", "text to type"), opt("--submit-key <key>", "key to press after")],
-    toPayload: (o) => ({ text: o.text, submitKey: o.submitKey }),
+    toPayload: (o) => ({ text: o['text'], submitKey: o['submitKey'] }),
   },
   {
     name: "press",
     description: "Press a key or combination",
     needsPort: true,
     flags: [req("--key <key>", "key or combination")],
-    toPayload: (o) => ({ key: o.key }),
+    toPayload: (o) => ({ key: o['key'] }),
   },
   {
     name: "drag",
     description: "Drag an element onto another",
     needsPort: true,
     flags: [req("--from <uid>", "element to drag"), req("--to <uid>", "drop target")],
-    toPayload: (o) => ({ from: o.from, to: o.to }),
+    toPayload: (o) => ({ from: o['from'], to: o['to'] }),
   },
   {
     name: "upload",
     description: "Upload a file through a file input",
     needsPort: true,
     flags: [req("--uid <uid>", "file input uid"), req("--file <path>", "local file path")],
-    toPayload: (o) => ({ uid: o.uid, file: o.file }),
+    toPayload: (o) => ({ uid: o['uid'], file: o['file'] }),
   },
   {
     name: "eval",
     description: "Evaluate JavaScript in page context",
     needsPort: true,
     flags: [req("--expression <code>", "JavaScript expression")],
-    toPayload: (o) => ({ expression: o.expression }),
+    toPayload: (o) => ({ expression: o['expression'] }),
   },
   {
     name: "pages",
@@ -161,21 +161,21 @@ const cliCommands: CliCommand[] = [
     description: "Open a new page/tab",
     needsPort: true,
     flags: [req("--url <url>", "URL to load")],
-    toPayload: (o) => ({ url: o.url }),
+    toPayload: (o) => ({ url: o['url'] }),
   },
   {
     name: "close-page",
     description: "Close a page/tab by index",
     needsPort: true,
     flags: [req("--page-id <id>", "page index")],
-    toPayload: (o) => ({ pageId: Number(o.pageId) }),
+    toPayload: (o) => ({ pageId: Number(o['pageId']) }),
   },
   {
     name: "select-page",
     description: "Switch focus to a page/tab",
     needsPort: true,
     flags: [req("--page-id <id>", "page index")],
-    toPayload: (o) => ({ pageId: Number(o.pageId) }),
+    toPayload: (o) => ({ pageId: Number(o['pageId']) }),
   },
   {
     name: "emulate",
@@ -188,10 +188,10 @@ const cliCommands: CliCommand[] = [
       opt("--color-scheme <scheme>", "dark or light"),
     ],
     toPayload: (o) => ({
-      viewport: o.viewport ? parseViewport(o.viewport) : undefined,
-      userAgent: o.userAgent,
-      geolocation: o.geolocation ? parseGeo(o.geolocation) : undefined,
-      colorScheme: o.colorScheme,
+      viewport: o['viewport'] ? parseViewport(o['viewport']) : undefined,
+      userAgent: o['userAgent'],
+      geolocation: o['geolocation'] ? parseGeo(o['geolocation']) : undefined,
+      colorScheme: o['colorScheme'],
     }),
   },
   {
@@ -200,9 +200,9 @@ const cliCommands: CliCommand[] = [
     needsPort: true,
     flags: [req("--text <texts>", "comma-separated texts"), req("--timeout <ms>", "max wait time")],
     toPayload: (o) => {
-      const text = o.text;
+      const text = o['text'];
       if (!text) throw new Error("--text is required");
-      return { texts: text.split(","), timeout: Number(o.timeout) };
+      return { texts: text.split(","), timeout: Number(o['timeout']) };
     },
   },
   {
@@ -210,28 +210,28 @@ const cliCommands: CliCommand[] = [
     description: "Handle a browser dialog",
     needsPort: true,
     flags: [req("--action <action>", "accept or dismiss"), opt("--prompt-text <text>", "prompt input")],
-    toPayload: (o) => ({ dialogAction: o.action, promptText: o.promptText }),
+    toPayload: (o) => ({ dialogAction: o['action'], promptText: o['promptText'] }),
   },
   {
     name: "trace-start",
     description: "Start a performance trace",
     needsPort: true,
     flags: [opt("--path <path>", "save trace to file")],
-    toPayload: (o) => ({ path: o.path }),
+    toPayload: (o) => ({ path: o['path'] }),
   },
   {
     name: "trace-stop",
     description: "Stop the performance trace",
     needsPort: true,
     flags: [opt("--path <path>", "save trace to file")],
-    toPayload: (o) => ({ path: o.path }),
+    toPayload: (o) => ({ path: o['path'] }),
   },
   {
     name: "heap-snapshot",
     description: "Capture a heap memory snapshot",
     needsPort: true,
     flags: [req("--path <path>", "save .heapsnapshot to file")],
-    toPayload: (o) => ({ path: o.path }),
+    toPayload: (o) => ({ path: o['path'] }),
   },
   {
     name: "network-start",
@@ -245,7 +245,7 @@ const cliCommands: CliCommand[] = [
     description: "List captured network requests",
     needsPort: true,
     flags: [opt("--type <type>", "filter by resource type")],
-    toPayload: (o) => ({ type: o.type }),
+    toPayload: (o) => ({ type: o['type'] }),
   },
   {
     name: "network-stop",
@@ -266,7 +266,7 @@ const cliCommands: CliCommand[] = [
     description: "List captured console messages",
     needsPort: true,
     flags: [opt("--type <type>", "filter by message type")],
-    toPayload: (o) => ({ type: o.type }),
+    toPayload: (o) => ({ type: o['type'] }),
   },
   {
     name: "console-stop",
@@ -319,12 +319,12 @@ cliCommands.forEach((def) => {
 
   cmd.action(run((opts) => {
     const payload: Record<string, unknown> = { action: def.name };
-    if (def.needsPort && opts.port) {
-      payload.port = Number(opts.port);
+    if (def.needsPort && opts['port']) {
+      payload['port'] = Number(opts['port']);
     }
     Object.assign(payload, def.toPayload(opts));
     return send(payload);
   }));
 });
 
-program.parseAsync();
+void program.parseAsync();

@@ -1,14 +1,21 @@
 import type { Page } from "puppeteer-core";
+import { z } from "zod";
 
-type RawAXNode = {
-  nodeId: string;
-  role?: { value: string };
-  name?: { value: string };
-  childIds?: string[];
-  value?: { value: string };
-  description?: { value: string };
-  ignored?: boolean;
-};
+const RawAXNodeSchema = z.object({
+  nodeId: z.string(),
+  role: z.object({ value: z.string() }).optional(),
+  name: z.object({ value: z.string() }).optional(),
+  childIds: z.array(z.string()).optional(),
+  value: z.object({ value: z.string() }).optional(),
+  description: z.object({ value: z.string() }).optional(),
+  ignored: z.boolean().optional(),
+});
+
+type RawAXNode = z.infer<typeof RawAXNodeSchema>;
+
+const AXTreeResponseSchema = z.object({
+  nodes: z.array(RawAXNodeSchema),
+});
 
 type AXTree = {
   role: string;
@@ -37,11 +44,12 @@ const buildTree = (
   const role = node.role ? node.role.value : "none";
   const name = node.name ? node.name.value : "";
 
+  const val = node.value?.value;
   return {
     role,
     name,
     uid: node.nodeId,
-    value: node.value?.value,
+    ...(val !== undefined ? { value: val } : {}),
     children,
   };
 };
@@ -57,10 +65,7 @@ const formatTree = (tree: AXTree, depth: number): string => {
 
 export const snapshot = async (page: Page): Promise<string> => {
   const client = await page.createCDPSession();
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- CDP response type not fully typed by puppeteer
-  const { nodes } = (await client.send("Accessibility.getFullAXTree")) as {
-    nodes: RawAXNode[];
-  };
+  const { nodes } = AXTreeResponseSchema.parse(await client.send("Accessibility.getFullAXTree"));
   await client.detach();
 
   const nodeMap = new Map(nodes.map((n) => [n.nodeId, n]));
@@ -79,7 +84,7 @@ export const screenshot = async (
   fullPage: boolean,
 ): Promise<string> => {
   const buffer = await page.screenshot({
-    path,
+    ...(path !== undefined ? { path } : {}),
     fullPage,
     type: "png",
   });

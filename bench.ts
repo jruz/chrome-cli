@@ -54,14 +54,18 @@ const runCli = async (args: string): Promise<number[]> => {
 const main = async () => {
   await ensureDaemon();
   const portStr = await send({ action: "launch", headless: true });
-  let port: number;
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(portStr);
-    port = parsed.port;
-  } catch {
-    log.error(`failed to parse launch response: ${portStr}`);
+    parsed = JSON.parse(portStr);
+  } catch (err) {
+    log.error(`failed to parse launch response: ${portStr} (${String(err)})`);
     process.exit(1);
   }
+  if (typeof parsed !== "object" || parsed === null || !("port" in parsed) || typeof parsed.port !== "number") {
+    log.error(`unexpected launch response: ${portStr}`);
+    process.exit(1);
+  }
+  const port = parsed.port;
 
   await send({ action: "navigate", port, url: TARGET_URL, timeout: 30000 });
 
@@ -96,7 +100,7 @@ const main = async () => {
     await Promise.all(pages.map(async (p, i) => ({ id: i, url: p.url(), title: await p.title() })));
   })));
 
-  session.browser.disconnect();
+  await session.browser.disconnect();
 
   const pad = (s: string, n: number) => s.padEnd(n);
   const rpad = (s: string, n: number) => s.padStart(n);
@@ -126,4 +130,4 @@ const main = async () => {
   await proc.exited;
 };
 
-main();
+void main();

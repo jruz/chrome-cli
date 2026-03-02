@@ -8,7 +8,7 @@ export const waitFor = async (
   const found = await Promise.race(
     texts.map(async (text) => {
       await page.waitForFunction(
-        (t: string) => document.body?.innerText?.includes(t),
+        (t: string) => document.body.innerText.includes(t),
         { timeout },
         text,
       );
@@ -24,13 +24,15 @@ export const handleDialog = async (
   promptText: string | undefined,
 ): Promise<string> => {
   return new Promise((resolve) => {
-    page.once("dialog", async (dialog) => {
-      if (action === "accept") {
-        await dialog.accept(promptText);
-      } else {
-        await dialog.dismiss();
-      }
-      resolve(JSON.stringify({ action, type: dialog.type() }));
+    page.once("dialog", (dialog) => {
+      void (async () => {
+        if (action === "accept") {
+          await dialog.accept(promptText);
+        } else {
+          await dialog.dismiss();
+        }
+        resolve(JSON.stringify({ action, type: dialog.type() }));
+      })();
     });
   });
 };

@@ -28,15 +28,20 @@ export type Session = {
   userDataDir: string;
 };
 
+const tryDebugPort = async (port: number): Promise<boolean> => {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
 const waitForDebugPort = async (port: number, timeoutMs: number): Promise<void> => {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${port}/json/version`);
-      if (res.ok) return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 100));
-    }
+    if (await tryDebugPort(port)) return;
+    await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error(`Chrome did not start on port ${port} within ${timeoutMs}ms`);
 };

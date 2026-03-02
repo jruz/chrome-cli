@@ -25,7 +25,7 @@ export const stopTrace = async (
 
   await client.send("Tracing.end");
   await new Promise<void>((resolve) => {
-    client.on("Tracing.tracingComplete", () => resolve());
+    client.on("Tracing.tracingComplete", () => { resolve(); });
   });
 
   const traceData = `[${chunks.join(",")}]`;
