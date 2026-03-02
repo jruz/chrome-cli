@@ -42,6 +42,8 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 ```
 chrome-cli launch [--headed]
+chrome-cli kill --port <port>
+chrome-cli kill-all
 chrome-cli navigate --port <port> --url <url> --timeout <ms>
 chrome-cli back|forward|reload --port <port>
 chrome-cli snapshot --port <port>
@@ -61,6 +63,12 @@ chrome-cli select-page --port <port> --page-id <id>
 chrome-cli emulate --port <port> [--viewport WxH] [--user-agent <str>] [--geolocation lat,lng] [--color-scheme dark|light]
 chrome-cli wait --port <port> --text <texts> --timeout <ms>
 chrome-cli dialog --port <port> --action accept|dismiss [--prompt-text <text>]
+chrome-cli network-start --port <port>
+chrome-cli network-list --port <port> [--type <type>]
+chrome-cli network-stop --port <port>
+chrome-cli console-start --port <port>
+chrome-cli console-list --port <port> [--type <type>]
+chrome-cli console-stop --port <port>
 chrome-cli trace-start --port <port> [--path <file>]
 chrome-cli trace-stop --port <port> [--path <file>]
 chrome-cli heap-snapshot --port <port> --path <file>
