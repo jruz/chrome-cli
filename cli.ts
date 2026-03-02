@@ -180,8 +180,16 @@ const cliCommands: CliCommand[] = [
     name: "eval",
     description: "Evaluate JavaScript in page context",
     needsPort: true,
-    flags: [req("--expression <code>", "JavaScript expression")],
-    toPayload: (o) => ({ expression: o['expression'] }),
+    flags: [req("--expression <code>", "JavaScript expression"), opt("--args <json>", "JSON array of {uid} element references")],
+    toPayload: (o) => {
+      const argsRaw = o['args'];
+      if (!argsRaw) return { expression: o['expression'] };
+      try {
+        return { expression: o['expression'], args: JSON.parse(argsRaw) };
+      } catch (err) {
+        throw new Error(`invalid JSON for --args: ${String(err)}`, { cause: err });
+      }
+    },
   },
   {
     name: "pages",

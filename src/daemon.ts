@@ -136,7 +136,11 @@ const commands = new Map<string, CommandDef>([
     return fillForm(page, fields);
   }}],
 
-  ["eval", { needs: "page", run: (page, p) => evaluate(page, str(p, "expression")) }],
+  ["eval", { needs: "page", run: (page, p) => {
+    const args = p['args'];
+    if (args !== undefined && !Array.isArray(args)) throw new Error("param 'args' must be an array");
+    return evaluate(page, str(p, "expression"), args);
+  }}],
 
   ["pages", { needs: "browser", run: (browser) => listPages(browser) }],
   ["new-page", { needs: "daemon", run: async (p) => {
