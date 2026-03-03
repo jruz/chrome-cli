@@ -123,13 +123,15 @@ type InsightSet = {
   navTs: number;
 };
 
-const AVAILABLE_INSIGHTS = [
+type InsightName = "DocumentLatency" | "LCPBreakdown" | "RenderBlocking" | "CLSCulprits" | "LongTasks";
+
+const AVAILABLE_INSIGHTS: InsightName[] = [
   "DocumentLatency",
   "LCPBreakdown",
   "RenderBlocking",
   "CLSCulprits",
   "LongTasks",
-] as const;
+];
 
 const groupByNavigation = (events: TraceEvent[]): InsightSet[] => {
   const navStarts = events
@@ -228,13 +230,14 @@ const extractCLSCulprits = (events: TraceEvent[], navTs: number): unknown => {
 
 const extractLongTasks = (events: TraceEvent[], navTs: number): unknown => {
   const toMs = (ts: number) => Math.round((ts - navTs) / 1000 * 100) / 100;
-  const tasks = events.filter((e) => e.name === "RunTask" && e.dur !== undefined && e.dur > 50000);
+  const tasks = events
+    .filter((e): e is TraceEvent & { dur: number } => e.name === "RunTask" && e.dur !== undefined && e.dur > 50000);
 
   return {
     count: tasks.length,
     tasks: tasks.map((e) => ({
       start: { ms: toMs(e.ts) },
-      duration: { ms: Math.round((e.dur ?? 0) / 1000 * 100) / 100 },
+      duration: { ms: Math.round(e.dur / 1000 * 100) / 100 },
     })),
   };
 };

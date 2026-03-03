@@ -300,6 +300,16 @@ const SNAPSHOT_ACTIONS = new Set([
   "click", "hover", "fill", "fill-form", "type", "press", "drag", "upload",
 ]);
 
+const mergeWithSnapshot = (result: string, snap: string): string => {
+  try {
+    const parsedResult = ParamsSchema.parse(JSON.parse(result));
+    const parsedSnap = ParamsSchema.parse(JSON.parse(snap));
+    return JSON.stringify({ ...parsedResult, snapshot: parsedSnap });
+  } catch (err) {
+    throw new Error(`failed to merge snapshot into response: ${String(err)}`, { cause: err });
+  }
+};
+
 const dispatch = async (params: Params): Promise<string> => {
   const action = str(params, "action");
   const def = commands.get(action);
@@ -311,9 +321,7 @@ const dispatch = async (params: Params): Promise<string> => {
       const result = await def.run(page, params);
       if (bool(params, "includeSnapshot") && SNAPSHOT_ACTIONS.has(action)) {
         const snap = await snapshot(page, false, undefined);
-        const parsedResult = ParamsSchema.parse(JSON.parse(result));
-        const parsedSnap = ParamsSchema.parse(JSON.parse(snap));
-        return JSON.stringify({ ...parsedResult, snapshot: parsedSnap });
+        return mergeWithSnapshot(result, snap);
       }
       return result;
     }
