@@ -16,6 +16,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `src/client.ts` — `send()` POSTs JSON to Unix socket, `ensureDaemon()` auto-starts daemon on first call
 - `src/daemon.ts` — long-lived Bun HTTP server on `/tmp/chrome-cli.sock`, holds sessions map, routes commands
 - `src/browser.ts` — `launch()` spawns detached Chrome with temp user-data-dir, `connect()` uses puppeteer
+- `src/config.ts` — exports `SOCKET_PATH` constant for Unix socket location
 - `src/commands/*.ts` — pure functions: take Page/Browser, return JSON string
 - `src/log.ts` — `log.info()`, `log.warn()`, `log.error()`
 
