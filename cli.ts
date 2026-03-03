@@ -234,21 +234,46 @@ const cliCommands: CliCommand[] = [
     description: "Emulate device features",
     needsPort: true,
     flags: [
-      opt("--viewport <WxH>", "viewport size"),
-      opt("--user-agent <string>", "user agent string"),
-      opt("--geolocation <lat,lng>", "geolocation"),
-      opt("--color-scheme <scheme>", "dark or light"),
+      opt("--viewport <WxH>", "viewport size (WxH or 'reset')"),
+      opt("--has-touch", "enable touch events"),
+      opt("--is-mobile", "enable mobile viewport"),
+      opt("--is-landscape", "landscape orientation"),
+      opt("--device-scale-factor <n>", "device pixel ratio"),
+      opt("--user-agent <string>", "user agent string (or 'reset')"),
+      opt("--geolocation <lat,lng>", "geolocation (or 'reset')"),
+      opt("--color-scheme <scheme>", "dark, light, or auto"),
       opt("--cpu-throttling <rate>", "CPU slowdown factor (1 to disable)"),
-      opt("--network-conditions <preset>", "Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G"),
+      opt("--network-conditions <preset>", "Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G, No emulation"),
     ],
-    toPayload: (o) => ({
-      viewport: o['viewport'] ? parseViewport(o['viewport']) : undefined,
-      userAgent: o['userAgent'],
-      geolocation: o['geolocation'] ? parseGeo(o['geolocation']) : undefined,
-      colorScheme: o['colorScheme'],
-      cpuThrottlingRate: o['cpuThrottling'] ? Number(o['cpuThrottling']) : undefined,
-      networkConditions: o['networkConditions'],
-    }),
+    toPayload: (o) => {
+      const resolveViewport = () => {
+        if (!o['viewport']) return undefined;
+        if (o['viewport'] === "reset") return "reset";
+        const vp = parseViewport(o['viewport']);
+        return {
+          ...vp,
+          ...(o['hasTouch'] ? { hasTouch: true } : {}),
+          ...(o['isMobile'] ? { isMobile: true } : {}),
+          ...(o['isLandscape'] ? { isLandscape: true } : {}),
+          ...(o['deviceScaleFactor'] ? { deviceScaleFactor: Number(o['deviceScaleFactor']) } : {}),
+        };
+      };
+
+      const resolveGeo = () => {
+        if (!o['geolocation']) return undefined;
+        if (o['geolocation'] === "reset") return "reset";
+        return parseGeo(o['geolocation']);
+      };
+
+      return {
+        viewport: resolveViewport(),
+        userAgent: o['userAgent'],
+        geolocation: resolveGeo(),
+        colorScheme: o['colorScheme'],
+        cpuThrottlingRate: o['cpuThrottling'] ? Number(o['cpuThrottling']) : undefined,
+        networkConditions: o['networkConditions'],
+      };
+    },
   },
   {
     name: "wait",

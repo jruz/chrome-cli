@@ -178,16 +178,29 @@ const commands = new Map<string, CommandDef>([
 
   ["emulate", { needs: "page", run: (page, p) => {
     const cs = optStr(p, "colorScheme");
-    if (cs !== undefined && cs !== "dark" && cs !== "light") throw new Error(`invalid colorScheme: ${cs}`);
+    if (cs !== undefined && cs !== "dark" && cs !== "light" && cs !== "auto") throw new Error(`invalid colorScheme: ${cs}`);
     const vp = p['viewport'];
     const geo = p['geolocation'];
     const ua = optStr(p, "userAgent");
     const cpu = optNum(p, "cpuThrottlingRate");
     const net = optStr(p, "networkConditions");
+
+    const resolveViewport = () => {
+      if (vp === "reset") return { viewport: "reset" as const };
+      if (isViewport(vp)) return { viewport: vp };
+      return {};
+    };
+
+    const resolveGeo = () => {
+      if (geo === "reset") return { geolocation: "reset" as const };
+      if (isGeo(geo)) return { geolocation: geo };
+      return {};
+    };
+
     return emulate(page, {
-      ...(isViewport(vp) ? { viewport: vp } : {}),
+      ...resolveViewport(),
       ...(ua !== undefined ? { userAgent: ua } : {}),
-      ...(isGeo(geo) ? { geolocation: geo } : {}),
+      ...resolveGeo(),
       ...(cs !== undefined ? { colorScheme: cs } : {}),
       ...(cpu !== undefined ? { cpuThrottlingRate: cpu } : {}),
       ...(net !== undefined ? { networkConditions: net } : {}),
