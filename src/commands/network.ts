@@ -15,9 +15,13 @@ export type NetworkEntry = {
   postData: string | undefined;
 };
 
+const MAX_PRESERVED = 3;
+
 export type NetworkCapture = {
   cdpSession: CDPSession;
   entries: NetworkEntry[];
+  preserved: NetworkEntry[][];
+  frameListener: () => void;
 };
 
 type RequestWillBeSent = {
@@ -44,6 +48,7 @@ type LoadingFailed = {
 export const startCapture = async (page: Page): Promise<NetworkCapture> => {
   const cdpSession = await page.createCDPSession();
   const entries: NetworkEntry[] = [];
+  const preserved: NetworkEntry[][] = [];
   const pending = new Map<string, NetworkEntry>();
 
   cdpSession.on("Network.requestWillBeSent", (params: RequestWillBeSent) => {
@@ -81,20 +86,37 @@ export const startCapture = async (page: Page): Promise<NetworkCapture> => {
     pending.delete(params.requestId);
   });
 
+  const frameListener = () => {
+    if (entries.length > 0) {
+      preserved.push([...entries]);
+      entries.length = 0;
+      pending.clear();
+      if (preserved.length > MAX_PRESERVED) {
+        preserved.shift();
+      }
+    }
+  };
+
+  page.on("framenavigated", frameListener);
   await cdpSession.send("Network.enable");
 
-  return { cdpSession, entries };
+  return { cdpSession, entries, preserved, frameListener };
 };
 
 export const listEntries = (
-  entries: NetworkEntry[],
+  capture: NetworkCapture,
   typeFilter: string | undefined,
+  includePreserved: boolean,
   pageIdx: number | undefined,
   pageSize: number | undefined,
 ): string => {
+  const all = includePreserved
+    ? [...capture.preserved.flat(), ...capture.entries]
+    : capture.entries;
+
   const filtered = typeFilter
-    ? entries.filter((e) => e.resourceType.toLowerCase() === typeFilter.toLowerCase())
-    : entries;
+    ? all.filter((e) => e.resourceType.toLowerCase() === typeFilter.toLowerCase())
+    : all;
 
   if (pageSize === undefined) return JSON.stringify(filtered);
   if (pageIdx === undefined) throw new Error("pageIdx is required when pageSize is set");
@@ -135,7 +157,8 @@ export const getEntry = async (
   });
 };
 
-export const stopCapture = async (capture: NetworkCapture): Promise<string> => {
+export const stopCapture = async (page: Page, capture: NetworkCapture): Promise<string> => {
+  page.off("framenavigated", capture.frameListener);
   await capture.cdpSession.detach();
   return JSON.stringify({ stopped: true, totalEntries: capture.entries.length });
 };

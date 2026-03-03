@@ -349,11 +349,13 @@ const cliCommands: CliCommand[] = [
     needsPort: true,
     flags: [
       opt("--type <type>", "filter by resource type"),
+      opt("--include-preserved", "include requests from last 3 navigations"),
       opt("--page-size <n>", "results per page"),
       opt("--page-idx <n>", "page number (0-based)"),
     ],
     toPayload: (o) => ({
       type: o['type'],
+      includePreserved: !!o['includePreserved'],
       pageSize: o['pageSize'] ? Number(o['pageSize']) : undefined,
       pageIdx: o['pageIdx'] ? Number(o['pageIdx']) : undefined,
     }),

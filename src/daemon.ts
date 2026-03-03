@@ -246,7 +246,7 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
-    return listNetworkEntries(capture.entries, optStr(p, "type"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
+    return listNetworkEntries(capture, optStr(p, "type"), bool(p, "includePreserved"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
   }}],
   ["network-get", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
@@ -258,7 +258,8 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
-    const result = await stopNetworkCapture(capture);
+    const session = await getSession(port);
+    const result = await stopNetworkCapture(session.page, capture);
     networkCaptures.delete(port);
     return result;
   }}],
