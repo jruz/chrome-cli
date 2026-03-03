@@ -102,9 +102,7 @@ const extractInsights = (events: TraceEvent[]): Record<string, unknown> => {
   };
 };
 
-export const analyzeTrace = async (
-  filePath: string,
-): Promise<string> => {
+const parseTraceEvents = async (filePath: string): Promise<TraceEvent[]> => {
   const raw = await Bun.file(filePath).text();
   let parsed: unknown;
   try {
@@ -115,8 +113,179 @@ export const analyzeTrace = async (
 
   const events = (Array.isArray(parsed) ? parsed.flat() : []).filter(isTraceEvent);
   if (events.length === 0) throw new Error("no trace events found in file");
+  return events;
+};
 
-  return JSON.stringify(extractInsights(events));
+type InsightSet = {
+  id: string;
+  url: string;
+  events: TraceEvent[];
+  navTs: number;
+};
+
+const AVAILABLE_INSIGHTS = [
+  "DocumentLatency",
+  "LCPBreakdown",
+  "RenderBlocking",
+  "CLSCulprits",
+  "LongTasks",
+] as const;
+
+const groupByNavigation = (events: TraceEvent[]): InsightSet[] => {
+  const navStarts = events
+    .map((e, i) => ({ event: e, idx: i }))
+    .filter(({ event }) => event.name === "navigationStart");
+
+  return navStarts.map(({ event, idx }, setIdx) => {
+    const nextNav = navStarts[setIdx + 1];
+    const nextNavIdx = nextNav ? nextNav.idx : events.length;
+    const url = typeof event.args?.['data'] === "object" && event.args['data'] !== null &&
+      "documentLoaderURL" in event.args['data'] &&
+      typeof event.args['data'].documentLoaderURL === "string"
+      ? event.args['data'].documentLoaderURL
+      : "unknown";
+
+    return {
+      id: `nav-${setIdx}`,
+      url,
+      events: events.slice(idx, nextNavIdx),
+      navTs: event.ts,
+    };
+  });
+};
+
+const extractDocumentLatency = (events: TraceEvent[], navTs: number): unknown => {
+  const toMs = (ts: number) => Math.round((ts - navTs) / 1000 * 100) / 100;
+  const resourceEvents = events.filter((e) =>
+    e.name === "ResourceSendRequest" || e.name === "ResourceReceiveResponse" || e.name === "ResourceFinish"
+  );
+
+  const docSend = resourceEvents.find((e) =>
+    e.name === "ResourceSendRequest" && typeof e.args?.['data'] === "object" && e.args['data'] !== null &&
+    "requestMethod" in e.args['data'] && e.args['data'].requestMethod === "GET"
+  );
+  if (!docSend) return { error: "no document request found" };
+
+  const docReceive = resourceEvents.find((e) => e.name === "ResourceReceiveResponse" && e.ts > docSend.ts);
+  const docFinish = resourceEvents.find((e) => e.name === "ResourceFinish" && e.ts > docSend.ts);
+
+  return {
+    requestStart: { ms: toMs(docSend.ts) },
+    responseReceived: docReceive ? { ms: toMs(docReceive.ts) } : null,
+    responseComplete: docFinish ? { ms: toMs(docFinish.ts) } : null,
+  };
+};
+
+const extractLCPBreakdown = (events: TraceEvent[], navTs: number): unknown => {
+  const toMs = (ts: number) => Math.round((ts - navTs) / 1000 * 100) / 100;
+
+  const fcp = events.find((e) => e.name === "firstContentfulPaint");
+  const lcp = events.filter((e) => e.name === "largestContentfulPaint::Candidate").pop();
+  if (!lcp) return { error: "no LCP event found" };
+
+  const docReceive = events.find((e) => e.name === "ResourceReceiveResponse");
+  const ttfb = docReceive ? toMs(docReceive.ts) : null;
+
+  return {
+    ttfb: ttfb !== null ? { ms: ttfb } : null,
+    firstContentfulPaint: fcp ? { ms: toMs(fcp.ts) } : null,
+    largestContentfulPaint: { ms: toMs(lcp.ts) },
+  };
+};
+
+const extractRenderBlocking = (events: TraceEvent[]): unknown => {
+  const blocking = events.filter((e) => {
+    if (e.name !== "ResourceSendRequest") return false;
+    const data = e.args?.['data'];
+    if (typeof data !== "object" || data === null) return false;
+    return "renderBlocking" in data && data.renderBlocking === "blocking";
+  });
+
+  return {
+    count: blocking.length,
+    resources: blocking.map((e) => {
+      const data = e.args?.['data'];
+      const url = typeof data === "object" && data !== null && "url" in data && typeof data.url === "string"
+        ? data.url
+        : "unknown";
+      return { url };
+    }),
+  };
+};
+
+const extractCLSCulprits = (events: TraceEvent[], navTs: number): unknown => {
+  const toMs = (ts: number) => Math.round((ts - navTs) / 1000 * 100) / 100;
+  const shifts = events.filter((e) => e.name === "LayoutShift");
+
+  return {
+    totalScore: Math.round(shifts.reduce((s, e) => s + shiftScore(e.args), 0) * 10000) / 10000,
+    shifts: shifts.map((e) => ({
+      time: { ms: toMs(e.ts) },
+      score: shiftScore(e.args),
+    })),
+  };
+};
+
+const extractLongTasks = (events: TraceEvent[], navTs: number): unknown => {
+  const toMs = (ts: number) => Math.round((ts - navTs) / 1000 * 100) / 100;
+  const tasks = events.filter((e) => e.name === "RunTask" && e.dur !== undefined && e.dur > 50000);
+
+  return {
+    count: tasks.length,
+    tasks: tasks.map((e) => ({
+      start: { ms: toMs(e.ts) },
+      duration: { ms: Math.round((e.dur ?? 0) / 1000 * 100) / 100 },
+    })),
+  };
+};
+
+const INSIGHT_EXTRACTORS: Record<string, (events: TraceEvent[], navTs: number) => unknown> = {
+  DocumentLatency: extractDocumentLatency,
+  LCPBreakdown: extractLCPBreakdown,
+  RenderBlocking: extractRenderBlocking,
+  CLSCulprits: extractCLSCulprits,
+  LongTasks: extractLongTasks,
+};
+
+export const analyzeTrace = async (
+  filePath: string,
+): Promise<string> => {
+  const events = await parseTraceEvents(filePath);
+  const sets = groupByNavigation(events);
+
+  const insightSets = sets.map((s) => ({
+    id: s.id,
+    url: s.url,
+    insights: [...AVAILABLE_INSIGHTS],
+  }));
+
+  const navEvent = events.find((e) => e.name === "navigationStart");
+  if (!navEvent) throw new Error("no navigationStart event found in trace");
+  const cwv = extractInsights(events);
+
+  return JSON.stringify({ ...cwv, insightSets });
+};
+
+export const analyzeInsight = async (
+  filePath: string,
+  insightSetId: string,
+  insightName: string,
+): Promise<string> => {
+  const events = await parseTraceEvents(filePath);
+  const sets = groupByNavigation(events);
+
+  const set = sets.find((s) => s.id === insightSetId);
+  if (!set) throw new Error(`insight set '${insightSetId}' not found, available: ${sets.map((s) => s.id).join(", ")}`);
+
+  const extractor = INSIGHT_EXTRACTORS[insightName];
+  if (!extractor) throw new Error(`unknown insight '${insightName}', available: ${AVAILABLE_INSIGHTS.join(", ")}`);
+
+  return JSON.stringify({
+    insightSetId: set.id,
+    url: set.url,
+    insight: insightName,
+    data: extractor(set.events, set.navTs),
+  });
 };
 
 export const takeHeapSnapshot = async (

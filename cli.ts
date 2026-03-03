@@ -288,6 +288,17 @@ const cliCommands: CliCommand[] = [
     toPayload: (o) => ({ path: o['path'] }),
   },
   {
+    name: "trace-analyze-insight",
+    description: "Get detailed info on a specific performance insight",
+    needsPort: false,
+    flags: [
+      req("--path <path>", "trace file to analyze"),
+      req("--insight-set-id <id>", "insight set ID from trace-analyze output"),
+      req("--insight-name <name>", "insight name (DocumentLatency, LCPBreakdown, RenderBlocking, CLSCulprits, LongTasks)"),
+    ],
+    toPayload: (o) => ({ path: o['path'], insightSetId: o['insightSetId'], insightName: o['insightName'] }),
+  },
+  {
     name: "heap-snapshot",
     description: "Capture a heap memory snapshot",
     needsPort: true,

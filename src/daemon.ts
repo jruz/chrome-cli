@@ -11,7 +11,7 @@ import { evaluate } from "./commands/evaluate";
 import { listPages, newPage, closePage, selectPage } from "./commands/page";
 import { emulate, resizePage } from "./commands/emulate";
 import { waitFor, handleDialog } from "./commands/wait";
-import { startTrace, stopTrace, analyzeTrace, takeHeapSnapshot } from "./commands/performance";
+import { startTrace, stopTrace, analyzeTrace, analyzeInsight, takeHeapSnapshot } from "./commands/performance";
 import {
   startCapture as startNetworkCapture,
   listEntries as listNetworkEntries,
@@ -214,6 +214,7 @@ const commands = new Map<string, CommandDef>([
     return result;
   }}],
   ["trace-analyze", { needs: "daemon", run: (p) => analyzeTrace(str(p, "path")) }],
+  ["trace-analyze-insight", { needs: "daemon", run: (p) => analyzeInsight(str(p, "path"), str(p, "insightSetId"), str(p, "insightName")) }],
   ["heap-snapshot", { needs: "page", run: (page, p) => takeHeapSnapshot(page, str(p, "path")) }],
 
   ["network-start", { needs: "daemon", run: async (p) => {
