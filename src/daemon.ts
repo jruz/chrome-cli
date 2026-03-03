@@ -169,7 +169,8 @@ const commands = new Map<string, CommandDef>([
   }}],
   ["select-page", { needs: "daemon", run: async (p) => {
     const session = await getSession(num(p, "port"));
-    const page = await selectPage(session.browser, num(p, "pageId"));
+    const btf = p['noBringToFront'] ? false : true;
+    const page = await selectPage(session.browser, num(p, "pageId"), btf);
     session.page = page;
     return JSON.stringify({ selected: num(p, "pageId") });
   }}],
@@ -295,6 +296,10 @@ const commands = new Map<string, CommandDef>([
   }}],
 ]);
 
+const SNAPSHOT_ACTIONS = new Set([
+  "click", "hover", "fill", "fill-form", "type", "press", "drag", "upload",
+]);
+
 const dispatch = async (params: Params): Promise<string> => {
   const action = str(params, "action");
   const def = commands.get(action);
@@ -303,7 +308,14 @@ const dispatch = async (params: Params): Promise<string> => {
   switch (def.needs) {
     case "page": {
       const { page } = await getSession(num(params, "port"));
-      return def.run(page, params);
+      const result = await def.run(page, params);
+      if (bool(params, "includeSnapshot") && SNAPSHOT_ACTIONS.has(action)) {
+        const snap = await snapshot(page, false, undefined);
+        const parsedResult = ParamsSchema.parse(JSON.parse(result));
+        const parsedSnap = ParamsSchema.parse(JSON.parse(snap));
+        return JSON.stringify({ ...parsedResult, snapshot: parsedSnap });
+      }
+      return result;
     }
     case "browser": {
       const { browser } = await getSession(num(params, "port"));

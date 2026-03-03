@@ -114,61 +114,61 @@ const cliCommands: CliCommand[] = [
     name: "click",
     description: "Click an element by uid",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid from snapshot"), opt("--dbl-click", "double click")],
-    toPayload: (o) => ({ uid: o['uid'], dblClick: !!o['dblClick'] }),
+    flags: [req("--uid <uid>", "element uid from snapshot"), opt("--dbl-click", "double click"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ uid: o['uid'], dblClick: !!o['dblClick'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "hover",
     description: "Hover over an element by uid",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid from snapshot")],
-    toPayload: (o) => ({ uid: o['uid'] }),
+    flags: [req("--uid <uid>", "element uid from snapshot"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ uid: o['uid'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "fill",
     description: "Clear and type a value into an input",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid"), req("--value <value>", "text to type")],
-    toPayload: (o) => ({ uid: o['uid'], value: o['value'] }),
+    flags: [req("--uid <uid>", "element uid"), req("--value <value>", "text to type"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ uid: o['uid'], value: o['value'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "type",
     description: "Type text into the focused element",
     needsPort: true,
-    flags: [req("--text <text>", "text to type"), opt("--submit-key <key>", "key to press after")],
-    toPayload: (o) => ({ text: o['text'], submitKey: o['submitKey'] }),
+    flags: [req("--text <text>", "text to type"), opt("--submit-key <key>", "key to press after"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ text: o['text'], submitKey: o['submitKey'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "press",
     description: "Press a key or combination",
     needsPort: true,
-    flags: [req("--key <key>", "key or combination")],
-    toPayload: (o) => ({ key: o['key'] }),
+    flags: [req("--key <key>", "key or combination"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ key: o['key'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "drag",
     description: "Drag an element onto another",
     needsPort: true,
-    flags: [req("--from <uid>", "element to drag"), req("--to <uid>", "drop target")],
-    toPayload: (o) => ({ from: o['from'], to: o['to'] }),
+    flags: [req("--from <uid>", "element to drag"), req("--to <uid>", "drop target"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ from: o['from'], to: o['to'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "upload",
     description: "Upload a file through a file input",
     needsPort: true,
-    flags: [req("--uid <uid>", "file input uid"), req("--file <path>", "local file path")],
-    toPayload: (o) => ({ uid: o['uid'], file: o['file'] }),
+    flags: [req("--uid <uid>", "file input uid"), req("--file <path>", "local file path"), opt("--include-snapshot", "include snapshot in response")],
+    toPayload: (o) => ({ uid: o['uid'], file: o['file'], includeSnapshot: !!o['includeSnapshot'] }),
   },
   {
     name: "fill-form",
     description: "Fill multiple form elements at once",
     needsPort: true,
-    flags: [req("--fields <json>", "JSON array of {uid, value} objects")],
+    flags: [req("--fields <json>", "JSON array of {uid, value} objects"), opt("--include-snapshot", "include snapshot in response")],
     toPayload: (o) => {
       const raw = o['fields'];
       if (!raw) throw new Error("--fields is required");
       try {
-        return { fields: JSON.parse(raw) };
+        return { fields: JSON.parse(raw), includeSnapshot: !!o['includeSnapshot'] };
       } catch (err) {
         throw new Error(`invalid JSON for --fields: ${String(err)}`, { cause: err });
       }
@@ -226,8 +226,8 @@ const cliCommands: CliCommand[] = [
     name: "select-page",
     description: "Switch focus to a page/tab",
     needsPort: true,
-    flags: [req("--page-id <id>", "page index")],
-    toPayload: (o) => ({ pageId: Number(o['pageId']) }),
+    flags: [req("--page-id <id>", "page index"), opt("--no-bring-to-front", "select without focusing")],
+    toPayload: (o) => ({ pageId: Number(o['pageId']), noBringToFront: !!o['noBringToFront'] }),
   },
   {
     name: "emulate",

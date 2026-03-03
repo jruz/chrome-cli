@@ -47,10 +47,11 @@ export const closePage = async (
 export const selectPage = async (
   browser: Browser,
   pageId: number,
+  bringToFront: boolean,
 ): Promise<Page> => {
   const pages = await browser.pages();
   const target = pages[pageId];
   if (!target) throw new Error(`page not found: ${String(pageId)}`);
-  await target.bringToFront();
+  if (bringToFront) await target.bringToFront();
   return target;
 };
