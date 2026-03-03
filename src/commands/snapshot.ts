@@ -8,7 +8,7 @@ const RawAXNodeSchema = z.object({
   role: z.object({ value: z.string() }).optional(),
   name: z.object({ value: z.string() }).optional(),
   childIds: z.array(z.string()).optional(),
-  value: z.object({ value: z.string() }).optional(),
+  value: z.object({ value: z.union([z.string(), z.number()]) }).optional(),
   description: z.object({ value: z.string() }).optional(),
   ignored: z.boolean().optional(),
 });
@@ -47,7 +47,8 @@ const buildTree = (
   const role = node.role ? node.role.value : "none";
   const name = node.name ? node.name.value : "";
 
-  const val = node.value?.value;
+  const rawVal = node.value?.value;
+  const val = rawVal !== undefined ? String(rawVal) : undefined;
   const desc = node.description?.value;
   return {
     role,

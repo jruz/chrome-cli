@@ -303,8 +303,7 @@ const SNAPSHOT_ACTIONS = new Set([
 const mergeWithSnapshot = (result: string, snap: string): string => {
   try {
     const parsedResult = ParamsSchema.parse(JSON.parse(result));
-    const parsedSnap = ParamsSchema.parse(JSON.parse(snap));
-    return JSON.stringify({ ...parsedResult, snapshot: parsedSnap });
+    return JSON.stringify({ ...parsedResult, snapshot: snap });
   } catch (err) {
     throw new Error(`failed to merge snapshot into response: ${String(err)}`, { cause: err });
   }
