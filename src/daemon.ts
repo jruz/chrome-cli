@@ -119,7 +119,11 @@ const commands = new Map<string, CommandDef>([
   ["status", { needs: "daemon", run: () => statusCmd(state) }],
   ["shutdown", { needs: "daemon", run: () => shutdownCmd(state) }],
 
-  ["navigate", { needs: "page", run: (page, p) => navigate(page, str(p, "url"), num(p, "timeout"), optStr(p, "initScript")) }],
+  ["navigate", { needs: "page", run: (page, p) => {
+    const bfu = optStr(p, "handleBeforeUnload");
+    if (bfu !== undefined && bfu !== "accept" && bfu !== "decline") throw new Error(`invalid handleBeforeUnload: ${bfu}`);
+    return navigate(page, str(p, "url"), num(p, "timeout"), optStr(p, "initScript"), bfu);
+  }}],
   ["back", { needs: "page", run: (page) => navigateBack(page) }],
   ["forward", { needs: "page", run: (page) => navigateForward(page) }],
   ["reload", { needs: "page", run: (page, p) => reload(page, bool(p, "ignoreCache")) }],
@@ -150,7 +154,7 @@ const commands = new Map<string, CommandDef>([
   ["new-page", { needs: "daemon", run: async (p) => {
     const session = await getSession(num(p, "port"));
     const bg = bool(p, "background");
-    const page = await newPage(session.browser, str(p, "url"), bg, optStr(p, "isolatedContext"));
+    const page = await newPage(session.browser, str(p, "url"), bg, optStr(p, "isolatedContext"), optNum(p, "timeout"));
     if (!bg) session.page = page;
     return JSON.stringify({ url: page.url(), title: await page.title() });
   }}],

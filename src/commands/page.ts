@@ -17,13 +17,14 @@ export const newPage = async (
   url: string,
   background: boolean,
   isolatedContext: string | undefined,
+  timeout: number | undefined,
 ): Promise<Page> => {
   const context = isolatedContext
     ? await browser.createBrowserContext()
     : browser.defaultBrowserContext();
   const page = await context.newPage();
   if (url) {
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeout ?? 30000 });
   }
   if (!background) {
     await page.bringToFront();

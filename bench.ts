@@ -91,7 +91,7 @@ const main = async () => {
 
   const session = await connect(port, "");
 
-  results.push(stats("navigate", "raw-cdp", await timeOp(() => navigate(session.page, TARGET_URL, 30000, undefined))));
+  results.push(stats("navigate", "raw-cdp", await timeOp(() => navigate(session.page, TARGET_URL, 30000, undefined, undefined))));
   results.push(stats("snapshot", "raw-cdp", await timeOp(() => snapshot(session.page, false, undefined))));
   results.push(stats("screenshot", "raw-cdp", await timeOp(() => screenshot(session.page, "/tmp/bench-shot-raw.png", false, "png", undefined, undefined))));
   results.push(stats("eval", "raw-cdp", await timeOp(() => evaluate(session.page, "document.title", undefined))));

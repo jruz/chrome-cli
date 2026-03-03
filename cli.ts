@@ -55,8 +55,13 @@ const cliCommands: CliCommand[] = [
     name: "navigate",
     description: "Navigate the current page to a URL",
     needsPort: true,
-    flags: [req("--url <url>", "target URL"), req("--timeout <ms>", "navigation timeout"), opt("--init-script <code>", "JavaScript to inject before load")],
-    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']), initScript: o['initScript'] }),
+    flags: [
+      req("--url <url>", "target URL"),
+      req("--timeout <ms>", "navigation timeout"),
+      opt("--init-script <code>", "JavaScript to inject before load"),
+      opt("--handle-before-unload <action>", "auto-handle beforeunload dialog (accept or decline)"),
+    ],
+    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']), initScript: o['initScript'], handleBeforeUnload: o['handleBeforeUnload'] }),
   },
   {
     name: "back",
@@ -206,8 +211,9 @@ const cliCommands: CliCommand[] = [
       req("--url <url>", "URL to load"),
       opt("--background", "open without focusing"),
       opt("--isolated-context <name>", "create page in isolated browser context"),
+      opt("--timeout <ms>", "navigation timeout"),
     ],
-    toPayload: (o) => ({ url: o['url'], background: !!o['background'], isolatedContext: o['isolatedContext'] }),
+    toPayload: (o) => ({ url: o['url'], background: !!o['background'], isolatedContext: o['isolatedContext'], timeout: o['timeout'] ? Number(o['timeout']) : undefined }),
   },
   {
     name: "close-page",
