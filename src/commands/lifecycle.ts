@@ -38,9 +38,18 @@ const cleanupSession = async (
 export const killCmd = async (state: DaemonState, port: number): Promise<string> => {
   const session = state.sessions.get(port);
   const pid = await findChromePid(port);
-  if (session) await cleanupSession(state, port, session);
-  if (pid) process.kill(pid, "SIGTERM");
   if (!session && !pid) throw new Error(`no Chrome found on port ${port}`);
+
+  setTimeout(() => {
+    const cleanup = async () => {
+      if (session) await cleanupSession(state, port, session);
+      if (pid) process.kill(pid, "SIGTERM");
+    };
+    cleanup().catch((err: unknown) => {
+      log.warn(`kill cleanup failed for port ${port}: ${String(err)}`);
+    });
+  }, 50);
+
   return JSON.stringify({ killed: port, pid });
 };
 
