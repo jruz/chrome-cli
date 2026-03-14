@@ -1,3 +1,6 @@
+setup:
+    just deps-install
+
 check:
     just ts-check
     just ts-lint
@@ -16,7 +19,16 @@ chrome-launch-headed:
     bun run cli.ts launch --headed
 
 chrome-build:
-    bun build cli.ts --compile --outfile dist/chrome-cli
+    #!/usr/bin/env nu
+    if ($env.REVISION? | is-empty) {
+        error make {msg: "ERROR: REVISION is not set"}
+    }
+    let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
+    (^bun build cli.ts
+        --compile
+        --outfile dist/chrome-cli
+        --define $"process.env.REVISION='($env.REVISION)'"
+        --define $"process.env.BUILD_TIME='($bt)'")
 
 chrome-install:
     mkdir -p ~/.local/bin

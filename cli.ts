@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { log } from "./src/log";
 import { ensureDaemon, send } from "./src/client";
+import { versionString } from "./src/version";
 
 type Flag = {
   flag: string;
@@ -436,7 +437,7 @@ const run = (fn: (opts: Record<string, string>) => Promise<string>) =>
 const program = new Command()
   .name("chrome-cli")
   .description("Control Chrome via CDP (Chrome DevTools Protocol)")
-  .version("0.1.0");
+  .version(versionString());
 
 program.command("daemon-start")
   .description("Start the background daemon")
