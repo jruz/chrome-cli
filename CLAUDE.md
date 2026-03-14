@@ -49,7 +49,7 @@ chrome-cli navigate --port <port> --url <url> --timeout <ms> [--init-script <cod
 chrome-cli back|forward --port <port>
 chrome-cli reload --port <port> [--ignore-cache]
 chrome-cli snapshot --port <port> [--verbose] [--path <file>]
-chrome-cli screenshot --port <port> [--path <file>] [--full-page] [--format png|jpeg|webp] [--quality <n>] [--uid <uid>]
+chrome-cli screenshot --port <port> --format png|jpeg|webp [--path <file>] [--full-page] [--quality <n>] [--uid <uid>]
 chrome-cli click --port <port> --uid <uid> [--dbl-click]
 chrome-cli hover --port <port> --uid <uid>
 chrome-cli fill --port <port> --uid <uid> --value <text>
@@ -78,6 +78,7 @@ chrome-cli console-stop --port <port>
 chrome-cli trace-start --port <port> [--path <file>] [--reload] [--auto-stop]
 chrome-cli trace-stop --port <port> [--path <file>]
 chrome-cli trace-analyze --path <file>
+chrome-cli trace-analyze-insight --path <file> --insight-set-id <id> --insight-name <name>
 chrome-cli heap-snapshot --port <port> --path <file>
 chrome-cli daemon-start
 chrome-cli daemon-status

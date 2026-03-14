@@ -98,14 +98,14 @@ const cliCommands: CliCommand[] = [
     flags: [
       opt("--path <path>", "save to file"),
       opt("--full-page", "capture full page"),
-      opt("--format <format>", "png, jpeg, or webp"),
+      req("--format <format>", "png, jpeg, or webp"),
       opt("--quality <n>", "compression quality 0-100 (jpeg/webp)"),
       opt("--uid <uid>", "capture a single element"),
     ],
     toPayload: (o) => ({
       path: o['path'],
       fullPage: !!o['fullPage'],
-      format: o['format'] ?? "png",
+      format: o['format'],
       quality: o['quality'] ? Number(o['quality']) : undefined,
       uid: o['uid'],
     }),

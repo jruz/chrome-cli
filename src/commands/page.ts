@@ -24,7 +24,7 @@ export const newPage = async (
     : browser.defaultBrowserContext();
   const page = await context.newPage();
   if (url) {
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeout ?? 30000 });
+    await page.goto(url, { waitUntil: "domcontentloaded", ...(timeout !== undefined ? { timeout } : {}) });
   }
   if (!background) {
     await page.bringToFront();

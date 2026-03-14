@@ -7,7 +7,7 @@ export type NetworkEntry = {
   requestId: string;
   url: string;
   method: string;
-  resourceType: string;
+  resourceType: string | undefined;
   status: number | null;
   encodedDataLength: number | null;
   requestHeaders: Headers;
@@ -56,7 +56,7 @@ export const startCapture = async (page: Page): Promise<NetworkCapture> => {
       requestId: params.requestId,
       url: params.request.url,
       method: params.request.method,
-      resourceType: params.type ?? "unknown",
+      resourceType: params.type,
       status: null,
       encodedDataLength: null,
       requestHeaders: params.request.headers,
@@ -115,7 +115,7 @@ export const listEntries = (
     : capture.entries;
 
   const filtered = typeFilter
-    ? all.filter((e) => e.resourceType.toLowerCase() === typeFilter.toLowerCase())
+    ? all.filter((e) => e.resourceType?.toLowerCase() === typeFilter.toLowerCase())
     : all;
 
   if (pageSize === undefined) return JSON.stringify(filtered);

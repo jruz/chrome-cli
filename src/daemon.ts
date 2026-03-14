@@ -129,7 +129,7 @@ const commands = new Map<string, CommandDef>([
   ["reload", { needs: "page", run: (page, p) => reload(page, bool(p, "ignoreCache")) }],
 
   ["snapshot", { needs: "page", run: (page, p) => snapshot(page, bool(p, "verbose"), optStr(p, "filePath")) }],
-  ["screenshot", { needs: "page", run: (page, p) => screenshot(page, optStr(p, "path"), bool(p, "fullPage"), optStr(p, "format") ?? "png", optNum(p, "quality"), optStr(p, "uid")) }],
+  ["screenshot", { needs: "page", run: (page, p) => screenshot(page, optStr(p, "path"), bool(p, "fullPage"), str(p, "format"), optNum(p, "quality"), optStr(p, "uid")) }],
 
   ["click", { needs: "page", run: (page, p) => click(page, str(p, "uid"), bool(p, "dblClick")) }],
   ["hover", { needs: "page", run: (page, p) => hover(page, str(p, "uid")) }],

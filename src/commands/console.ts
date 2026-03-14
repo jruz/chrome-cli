@@ -5,8 +5,8 @@ const MAX_PRESERVED = 3;
 export type ConsoleEntry = {
   type: string;
   text: string;
-  url: string | null;
-  lineNumber: number | null;
+  url: string | undefined;
+  lineNumber: number | undefined;
 };
 
 export type ConsoleCapture = {
@@ -25,8 +25,8 @@ export const startCapture = (page: Page): ConsoleCapture => {
     entries.push({
       type: msg.type(),
       text: msg.text(),
-      url: location.url ?? null,
-      lineNumber: location.lineNumber ?? null,
+      url: location.url,
+      lineNumber: location.lineNumber,
     });
   };
 
