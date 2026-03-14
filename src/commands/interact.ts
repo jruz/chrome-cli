@@ -8,34 +8,45 @@ const toKeyInput = (key: string): KeyInput => {
   return key;
 };
 
+const ATTR = "data-chrome-cli-uid";
+
 export const findByUid = async (
   page: Page,
   uid: string,
 ): Promise<ElementHandle | null> => {
-  const element = await page.$(`[data-uid="${uid}"]`);
-  if (element) return element;
+  const cached = await page.$(`[${ATTR}="${uid}"]`);
+  if (cached) return cached;
 
-  const found = await page.evaluate(
-    (nodeId) => {
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_ELEMENT,
-      );
-      let index = 0;
-      while (walker.nextNode()) {
-        if (String(index) === nodeId && walker.currentNode instanceof Element) {
-          walker.currentNode.setAttribute("data-uid", nodeId);
-          return true;
-        }
-        index++;
-      }
-      return false;
-    },
-    uid,
-  );
+  const client = await page.createCDPSession();
+  try {
+    const { nodes } = await client.send("Accessibility.getFullAXTree");
+    const axNode = nodes.find(
+      (n: { nodeId: string }) => n.nodeId === uid,
+    );
+    if (!axNode) return null;
+    const backendId = axNode.backendDOMNodeId;
+    if (backendId === undefined) return null;
 
-  if (!found) return null;
-  return page.$(`[data-uid="${uid}"]`);
+    const { object } = await client.send("DOM.resolveNode", {
+      backendNodeId: backendId,
+    });
+    if (!object.objectId) return null;
+
+    await client.send("Runtime.callFunctionOn", {
+      objectId: object.objectId,
+      functionDeclaration: `function(uid) {
+        const el = this.nodeType === 3 ? this.parentElement : this;
+        if (el && el.setAttribute) el.setAttribute('${ATTR}', uid);
+      }`,
+      arguments: [{ value: uid }],
+    });
+
+    await client.send("Runtime.releaseObject", { objectId: object.objectId });
+  } finally {
+    await client.detach();
+  }
+
+  return page.$(`[${ATTR}="${uid}"]`);
 };
 
 export const click = async (

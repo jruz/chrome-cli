@@ -8,7 +8,7 @@ const isEvalArg = (v: unknown): v is EvalArg =>
   "uid" in v && typeof v.uid === "string";
 
 const buildEvalScript = (expression: string, uids: string[]): string => {
-  const queries = uids.map((uid, i) => `var _a${i}=document.querySelector('[data-uid="${uid}"]');`).join("");
+  const queries = uids.map((uid, i) => `var _a${i}=document.querySelector('[data-chrome-cli-uid="${uid}"]');`).join("");
   const argList = uids.map((_, i) => `_a${i}`).join(",");
   return `(()=>{${queries}return(${expression})(${argList});})()`;
 };
