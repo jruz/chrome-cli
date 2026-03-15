@@ -3,22 +3,29 @@ import { spawn } from "child_process";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import which from "which";
 
-const CHROME_PATHS = {
-  darwin: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  linux: "/usr/bin/google-chrome",
-} as const;
+type ChromeCandidate =
+  | "google-chrome-stable"
+  | "google-chrome"
+  | "chromium-browser"
+  | "chromium";
 
-type Platform = keyof typeof CHROME_PATHS;
-
-const isPlatform = (p: string): p is Platform => p in CHROME_PATHS;
+const CANDIDATES: ChromeCandidate[] = [
+  "google-chrome-stable",
+  "google-chrome",
+  "chromium-browser",
+  "chromium",
+];
 
 const chromeExecutable = (): string => {
-  const platform = process.platform;
-  if (!isPlatform(platform)) {
-    throw new Error(`unsupported platform: ${platform}`);
+  for (const name of CANDIDATES) {
+    const resolved = which.sync(name, { nothrow: true });
+    if (resolved) return resolved;
   }
-  return CHROME_PATHS[platform];
+  throw new Error(
+    `chrome/chromium not found in PATH. Searched: ${CANDIDATES.join(", ")}`,
+  );
 };
 
 export type Session = {
