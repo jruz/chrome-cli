@@ -36,8 +36,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `bun test` — run tests
 - `just check` — lint
 - `just chrome-bench` — run benchmark
-- `just chrome-build` — compile to `dist/chrome-cli`
-- `just chrome-install` — build and copy to `~/.local/bin/`
+- `just install` — build and copy to `~/.local/bin/`
 
 ## Commands
 
