@@ -473,4 +473,9 @@ cliCommands.forEach((def) => {
   }));
 });
 
-void program.parseAsync();
+if (process.argv.includes("--__daemon")) {
+  const { start } = await import("./src/daemon");
+  start();
+} else {
+  void program.parseAsync();
+}

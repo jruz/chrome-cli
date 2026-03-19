@@ -358,4 +358,4 @@ const start = () => {
   log.info(`daemon listening on ${SOCKET_PATH} (pid: ${process.pid})`);
 };
 
-start();
+export { start };

@@ -39,8 +39,16 @@ export const isDaemonRunning = async (): Promise<boolean> => {
   }
 };
 
+const daemonCommand = (): string[] => {
+  const main = Bun.main;
+  if (main !== process.execPath) {
+    return [process.execPath, main, "--__daemon"];
+  }
+  return [process.execPath, "--__daemon"];
+};
+
 export const startDaemon = async (): Promise<void> => {
-  const proc = Bun.spawn(["bun", "run", "src/daemon.ts"], {
+  const proc = Bun.spawn(daemonCommand(), {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
   });
