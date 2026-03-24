@@ -33,11 +33,15 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.bun
+            pkgs.just
+            pkgs.nushell
+            pkgs.woodpecker-cli
           ];
 
           shellHook = ''
             echo ""
             echo "  Bun: ${pkgs.bun.version}"
+            echo "  Woodpecker CLI: ${pkgs.woodpecker-cli.version}"
             echo ""
           '';
         };

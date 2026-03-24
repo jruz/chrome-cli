@@ -1,0 +1,32 @@
+repo:
+  name: jruz/chrome-cli
+secrets:
+  CODEBERG_TOKEN:
+    events:
+    - tag
+    - push
+    images: null
+    value: |
+      -----BEGIN AGE ENCRYPTED FILE-----
+      YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHSHNWdUp4SmgvY2hLQzJW
+      REZxK0gvMndNSFRwMENPVUZXY2RQUXJGY0M4CjFVc0RBaDBoSjhGdGF5TjExL2cv
+      TzMzWmxRSzhiekZubnp2UWlFakNjTkEKLT4gY3tuRi1ncmVhc2UgSApiREcrRE1S
+      UjRsdDI0aVhUOGNiMHJnMzFFRkVxUlRZQ21NTWRuSHlqUmc2QlMvWkdaNEJScXhK
+      cHl3Tk55YU0KLS0tIEhmbDZpL25lNnpKWlJEejdXdk9YMmJ0UERyNEQ5NzZPa0J0
+      WkVqcnY2ZlEKZoOBNCpPn/ew11l4QRp2tQzsb9X+fck0L4A9fzw7NFwnDiUI6QTB
+      FB1gARyqb602EjO/coWJQAprj5361wgNDM3dRn3E86as
+      -----END AGE ENCRYPTED FILE-----
+settings:
+  allow_deploy: false
+  allow_pr: true
+  cancel_previous_pipeline_events:
+  - push
+  - pull_request
+  config_extension_endpoint: ''
+  require_approval: forks
+  timeout: 60
+  trusted:
+    network: false
+    security: false
+    volumes: true
+  visibility: public

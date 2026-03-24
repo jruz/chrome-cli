@@ -4,6 +4,12 @@ setup:
 check:
     just ts-check
     just ts-lint
+    just woodpecker-check
+
+woodpecker-check:
+    woodpecker-cli lint \
+        --strict \
+        .woodpecker/
 
 install:
     just chrome-build
