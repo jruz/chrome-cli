@@ -54,3 +54,9 @@ ts-test:
 
 deps-install:
     bun install
+
+release-upload TAG:
+    bun scripts/release-upload.ts {{ TAG }}
+
+release-delete TAG:
+    bun scripts/release-delete.ts {{ TAG }}
