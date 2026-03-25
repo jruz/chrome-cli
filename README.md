@@ -70,6 +70,14 @@ CLI → Unix socket → Daemon → CDP → Chrome
 
 Multiple CLI invocations can control different Chrome instances in parallel by using different `--port` values.
 
+## Claude Code skill
+
+A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code/skills) is included in `skills/chrome/SKILL.md`. Copy it to your skills directory to give Claude Code full knowledge of chrome-cli commands and usage patterns:
+
+```bash
+cp -r skills/chrome ~/.claude/skills/
+```
+
 ## AI disclaimer
 
 This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by a custom [eslint config](eslint.config.ts) and [slop-detector](https://codeberg.org/jruz/slop-detector).
