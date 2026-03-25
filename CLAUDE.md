@@ -38,6 +38,31 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `just chrome-bench` — run benchmark
 - `just install` — build and copy to `~/.local/bin/`
 
+## Release
+
+Local release workflow — no CI involved. All steps run locally via `just release <version>`:
+
+1. Bumps `package.json` to the given version
+2. Cross-compiles 4 binaries to `dist/` (linux-x64, linux-arm64, darwin-x64, darwin-arm64) via `scripts/release-build.sh`
+3. Computes nix SRI hashes for each binary
+4. Updates `default.nix` version and `hashes.nix` with correct hashes (via `nix-editor`)
+5. Commits `package.json` + `default.nix` + `hashes.nix`, tags `vX.Y.Z`, pushes to origin
+6. Creates Codeberg release and uploads binaries
+
+### Release scripts
+
+- `scripts/release.ts` — orchestrates the full release flow
+- `scripts/release-build.sh` — cross-compiles a single target to `dist/` (`release-build.sh <os> <arch>`)
+- `scripts/release-upload.ts` — creates Codeberg release and uploads binaries from `dist/`
+- `scripts/release-delete.ts` — deletes tag + release (local, remote, and Codeberg)
+
+### Nix packaging
+
+- `default.nix` fetches pre-built binaries from Codeberg releases (not built from source)
+- `hashes.nix` — flat attrset of per-platform SRI hashes, edited by `nix-editor` during release
+- `autoPatchelfHook` corrupts Bun-compiled binaries — only `patchelf --set-interpreter` is safe
+- No official nixpkgs builder for Bun exists; bun2nix has lockfile parsing bugs
+
 ## Commands
 
 ```

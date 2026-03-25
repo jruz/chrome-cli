@@ -25,6 +25,7 @@
             pkgs.bun
             pkgs.just
             pkgs.nushell
+            pkgs.nix-editor
             pkgs.woodpecker-cli
           ];
 

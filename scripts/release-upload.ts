@@ -9,6 +9,28 @@ const parseId = (data: unknown): number => {
   return id;
 };
 
+const run = async (cmd: string[]): Promise<{ ok: boolean; stdout: string }> => {
+  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
+  const stdout = await new Response(proc.stdout).text();
+  const code = await proc.exited;
+  return { ok: code === 0, stdout: stdout.trim() };
+};
+
+const repoFromRemote = async (): Promise<string> => {
+  const result = await run(["git", "remote", "get-url", "origin"]);
+  if (!result.ok) throw new Error("failed to get origin remote URL");
+  const match = /codeberg\.org[:/](.+?)(?:\.git)?$/.exec(result.stdout);
+  if (!match?.[1])
+    throw new Error(`cannot parse repo from remote: ${result.stdout}`);
+  return match[1];
+};
+
+const nameFromRepo = (repo: string): string => {
+  const name = repo.split("/").pop();
+  if (!name) throw new Error(`cannot parse name from repo: ${repo}`);
+  return name;
+};
+
 const headers = (token: string) => ({
   Authorization: `token ${token}`,
 });
@@ -59,7 +81,7 @@ const upload = async (
   repo: string,
 ): Promise<void> => {
   const url = `https://codeberg.org/api/v1/repos/${repo}/releases/${releaseId}/assets?name=${file}`;
-  const body = await Bun.file(file).arrayBuffer();
+  const body = await Bun.file(`dist/${file}`).arrayBuffer();
 
   const res = await fetch(url, {
     method: "POST",
@@ -87,14 +109,11 @@ const main = async () => {
   const token = process.env["CODEBERG_TOKEN"];
   if (!token) throw new Error("CODEBERG_TOKEN is not set");
 
-  const repo = process.env["CI_REPO"];
-  if (!repo) throw new Error("CI_REPO is not set");
-
-  const name = process.env["CI_REPO_NAME"];
-  if (!name) throw new Error("CI_REPO_NAME is not set");
+  const repo = await repoFromRemote();
+  const name = nameFromRepo(repo);
 
   const glob = new Glob(`${name}-*`);
-  const files = Array.from(glob.scanSync("."));
+  const files = Array.from(glob.scanSync("dist"));
 
   if (files.length === 0) {
     log.error(`no ${name}-* files found`);
