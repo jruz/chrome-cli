@@ -3,29 +3,15 @@ import { spawn } from "child_process";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import which from "which";
-
-type ChromeCandidate =
-  | "google-chrome-stable"
-  | "google-chrome"
-  | "chromium-browser"
-  | "chromium";
-
-const CANDIDATES: ChromeCandidate[] = [
-  "google-chrome-stable",
-  "google-chrome",
-  "chromium-browser",
-  "chromium",
-];
+import { Launcher } from "chrome-launcher";
 
 const chromeExecutable = (): string => {
-  for (const name of CANDIDATES) {
-    const resolved = which.sync(name, { nothrow: true });
-    if (resolved) return resolved;
+  const installations = Launcher.getInstallations();
+  const first = installations[0];
+  if (!first) {
+    throw new Error("chrome/chromium not found");
   }
-  throw new Error(
-    `chrome/chromium not found in PATH. Searched: ${CANDIDATES.join(", ")}`,
-  );
+  return first;
 };
 
 export type Session = {
