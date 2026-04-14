@@ -7,7 +7,17 @@ description: Debug UI with chrome-cli via CDP. Use when visually verifying chang
 
 Use `chrome-cli` to control Chrome via CDP for visual verification during development.
 
-## Quick Debug Workflow
+## One-shot Fetch
+
+For quick content retrieval without managing browser lifecycle:
+
+- Text: `chrome-cli fetch --url <url> --timeout 30000 --format png`
+- Screenshot: `chrome-cli fetch --url <url> --timeout 30000 --format png --screenshot --path /tmp/page.png`
+- Full page: `chrome-cli fetch --url <url> --timeout 30000 --format png --screenshot --full-page --path /tmp/page.png`
+
+Uses `networkidle0` wait strategy — works with SPAs.
+
+## Multi-step Debug Workflow
 
 1. Launch: `chrome-cli launch` (returns port)
 2. Navigate: `chrome-cli navigate --port <port> --url <url> --timeout 10000`
@@ -20,6 +30,7 @@ Use `chrome-cli` to control Chrome via CDP for visual verification during develo
 
 | Command                 | Purpose                       | Key Flags                                                                                                       |
 | ----------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `fetch`                 | One-shot page fetch           | `--url --timeout --format [--screenshot] [--path] [--full-page] [--quality]`                                    |
 | `launch`                | Start Chrome instance         | `--headed`                                                                                                      |
 | `kill`                  | Stop Chrome instance          | `--port`                                                                                                        |
 | `kill-all`              | Stop all instances            |                                                                                                                 |

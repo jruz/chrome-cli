@@ -38,6 +38,10 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `just chrome-bench` — run benchmark
 - `just install` — build and copy to `~/.local/bin/`
 
+## Claude Code Skill
+
+`skills/chrome/SKILL.md` — bundled skill for Claude Code users of chrome-cli. Keep it in sync with the commands below when adding or changing commands.
+
 ## Release
 
 Local release workflow — no CI involved. All steps run locally via `just release <version>`:
@@ -66,6 +70,7 @@ Local release workflow — no CI involved. All steps run locally via `just relea
 ## Commands
 
 ```
+chrome-cli fetch --url <url> --timeout <ms> --format <format> [--screenshot] [--path <file>] [--full-page] [--quality <n>]
 chrome-cli launch [--headed]
 chrome-cli kill --port <port>
 chrome-cli kill-all
