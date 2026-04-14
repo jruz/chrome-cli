@@ -49,6 +49,12 @@ ts-check:
 ts-lint:
     bun run eslint .
 
+fix:
+    just ts-fix
+
+ts-fix:
+    bun run eslint --fix .
+
 ts-test:
     bun test
 
