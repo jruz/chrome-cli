@@ -80,13 +80,12 @@ const updateNixHashes = async (
 ): Promise<void> => {
   await nixEdit("default.nix", "version", version);
 
-  await Promise.all(
-    TARGETS.map(async (target) => {
+  const edits = TARGETS.map(async (target) => {
       const hash = hashes.get(target.nixSystem);
       if (!hash) throw new Error(`missing hash for ${target.nixSystem}`);
       await nixEdit("hashes.nix", target.nixSystem, hash);
-    }),
-  );
+    });
+  await Promise.all(edits);
 };
 
 const gitCommitTagPush = async (
@@ -129,21 +128,21 @@ const main = async () => {
   const revision = await gitRevision();
   log.info(`revision: ${revision}`);
 
+  const initial = Promise.resolve();
   await TARGETS.reduce(async (prev, target) => {
     await prev;
     await buildTarget(target.os, target.arch, revision);
-  }, Promise.resolve());
+  }, initial);
 
   const name = "chrome-cli";
-  const entries: [string, string][] = await Promise.all(
-    TARGETS.map(async (target) => {
+  const hashTasks = TARGETS.map(async (target) => {
       const file = `dist/${name}-${target.os}-${target.arch}`;
       const hash = await nixHash(file);
       log.info(`${target.nixSystem}: ${hash}`);
       const entry: [string, string] = [target.nixSystem, hash];
       return entry;
-    }),
-  );
+    });
+  const entries: [string, string][] = await Promise.all(hashTasks);
   const hashes = new Map(entries);
 
   await updateNixHashes(version, hashes);

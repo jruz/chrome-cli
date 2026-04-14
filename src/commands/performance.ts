@@ -12,7 +12,8 @@ const collectTrace = async (
 ): Promise<string> => {
   const chunks: string[] = [];
   client.on("Tracing.dataCollected", (params: { value: unknown[] }) => {
-    chunks.push(JSON.stringify(params.value));
+    const serialized = JSON.stringify(params.value);
+    chunks.push(serialized);
   });
 
   await client.send("Tracing.end");
@@ -22,7 +23,8 @@ const collectTrace = async (
 
   await client.detach();
 
-  const traceData = `[${chunks.join(",")}]`;
+  const joined = chunks.join(",");
+  const traceData = `[${joined}]`;
   if (filePath) {
     await Bun.write(filePath, traceData);
     return JSON.stringify({ saved: filePath });
@@ -77,7 +79,8 @@ const shiftScore = (args: Record<string, unknown> | undefined): number => {
   const data = args?.['data'];
   if (typeof data !== "object" || data === null) return 0;
   if (!("score" in data)) return 0;
-  const record: Record<string, unknown> = Object.fromEntries(Object.entries(data));
+  const dataEntries = Object.entries(data);
+  const record: Record<string, unknown> = Object.fromEntries(dataEntries);
   const s = record['score'];
   if (typeof s !== "number") return 0;
   return s;
@@ -306,7 +309,8 @@ export const takeHeapSnapshot = async (
     reportProgress: false,
   });
 
-  await Bun.write(filePath, chunks.join(""));
+  const heapData = chunks.join("");
+  await Bun.write(filePath, heapData);
   await client.detach();
 
   return JSON.stringify({ saved: filePath });

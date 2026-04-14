@@ -5,16 +5,15 @@ export const waitFor = async (
   texts: string[],
   timeout: number,
 ): Promise<string> => {
-  const found = await Promise.race(
-    texts.map(async (text) => {
-      await page.waitForFunction(
-        (t: string) => document.body.innerText.includes(t),
-        { timeout },
-        text,
-      );
-      return text;
-    }),
-  );
+  const promises = texts.map(async (text) => {
+    await page.waitForFunction(
+      (t: string) => document.body.innerText.includes(t),
+      { timeout },
+      text,
+    );
+    return text;
+  });
+  const found = await Promise.race(promises);
   return JSON.stringify({ found });
 };
 
@@ -31,7 +30,9 @@ export const handleDialog = async (
         } else {
           await dialog.dismiss();
         }
-        resolve(JSON.stringify({ action, type: dialog.type() }));
+        const dialogType = dialog.type();
+        const result = JSON.stringify({ action, type: dialogType });
+        resolve(result);
       })();
     });
   });

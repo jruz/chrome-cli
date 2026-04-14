@@ -48,7 +48,8 @@ const daemonCommand = (): string[] => {
 };
 
 export const startDaemon = async (): Promise<void> => {
-  const proc = Bun.spawn(daemonCommand(), {
+  const cmd = daemonCommand();
+  const proc = Bun.spawn(cmd, {
     detached: true,
     stdio: ["ignore", "ignore", "ignore"],
   });

@@ -90,7 +90,8 @@ export const typeText = async (
 ): Promise<string> => {
   await page.keyboard.type(text);
   if (submitKey) {
-    await page.keyboard.press(toKeyInput(submitKey));
+    const key = toKeyInput(submitKey);
+    await page.keyboard.press(key);
   }
   return JSON.stringify({ typed: text, submitKey });
 };
@@ -99,7 +100,8 @@ export const pressKey = async (
   page: Page,
   key: string,
 ): Promise<string> => {
-  await page.keyboard.press(toKeyInput(key));
+  const input = toKeyInput(key);
+  await page.keyboard.press(input);
   return JSON.stringify({ pressed: key });
 };
 
@@ -156,9 +158,14 @@ export const fillForm = async (
     return field;
   });
 
+  const initial = Promise.resolve(new Array<{ uid: string; value: string }>());
   const results = await validated.reduce(
-    async (accP, field) => [...await accP, await fillOne(page, field)],
-    Promise.resolve(new Array<{ uid: string; value: string }>()),
+    async (accP, field) => {
+      const acc = await accP;
+      const result = await fillOne(page, field);
+      return [...acc, result];
+    },
+    initial,
   );
 
   return JSON.stringify({ filled: results });

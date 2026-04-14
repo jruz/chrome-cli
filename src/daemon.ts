@@ -29,7 +29,9 @@ import { SOCKET_PATH } from "./config";
 import { unlinkSync } from "fs";
 import { z } from "zod";
 
-const ParamsSchema = z.record(z.string(), z.unknown());
+const keySchema = z.string();
+const valSchema = z.unknown();
+const ParamsSchema = z.record(keySchema, valSchema);
 
 type Params = z.infer<typeof ParamsSchema>;
 
@@ -113,8 +115,14 @@ const getSession = async (port: number): Promise<Session> => {
 };
 
 const commands = new Map<string, CommandDef>([
-  ["launch", { needs: "daemon", run: (p) => launchCmd(state, bool(p, "headless")) }],
-  ["kill", { needs: "daemon", run: (p) => killCmd(state, num(p, "port")) }],
+  ["launch", { needs: "daemon", run: (p) => {
+    const headless = bool(p, "headless");
+    return launchCmd(state, headless);
+  }}],
+  ["kill", { needs: "daemon", run: (p) => {
+    const port = num(p, "port");
+    return killCmd(state, port);
+  }}],
   ["kill-all", { needs: "daemon", run: () => killAllCmd(state) }],
   ["status", { needs: "daemon", run: () => statusCmd(state) }],
   ["shutdown", { needs: "daemon", run: () => shutdownCmd(state) }],
@@ -122,22 +130,65 @@ const commands = new Map<string, CommandDef>([
   ["navigate", { needs: "page", run: (page, p) => {
     const bfu = optStr(p, "handleBeforeUnload");
     if (bfu !== undefined && bfu !== "accept" && bfu !== "decline") throw new Error(`invalid handleBeforeUnload: ${bfu}`);
-    return navigate(page, str(p, "url"), num(p, "timeout"), optStr(p, "initScript"), bfu);
+    const url = str(p, "url");
+    const timeout = num(p, "timeout");
+    const initScript = optStr(p, "initScript");
+    return navigate(page, url, timeout, initScript, bfu);
   }}],
   ["back", { needs: "page", run: (page) => navigateBack(page) }],
   ["forward", { needs: "page", run: (page) => navigateForward(page) }],
-  ["reload", { needs: "page", run: (page, p) => reload(page, bool(p, "ignoreCache")) }],
+  ["reload", { needs: "page", run: (page, p) => {
+    const ignoreCache = bool(p, "ignoreCache");
+    return reload(page, ignoreCache);
+  }}],
 
-  ["snapshot", { needs: "page", run: (page, p) => snapshot(page, bool(p, "verbose"), optStr(p, "filePath")) }],
-  ["screenshot", { needs: "page", run: (page, p) => screenshot(page, optStr(p, "path"), bool(p, "fullPage"), str(p, "format"), optNum(p, "quality"), optStr(p, "uid")) }],
+  ["snapshot", { needs: "page", run: (page, p) => {
+    const verbose = bool(p, "verbose");
+    const filePath = optStr(p, "filePath");
+    return snapshot(page, verbose, filePath);
+  }}],
+  ["screenshot", { needs: "page", run: (page, p) => {
+    const path = optStr(p, "path");
+    const fullPage = bool(p, "fullPage");
+    const format = str(p, "format");
+    const quality = optNum(p, "quality");
+    const uid = optStr(p, "uid");
+    return screenshot(page, path, fullPage, format, quality, uid);
+  }}],
 
-  ["click", { needs: "page", run: (page, p) => click(page, str(p, "uid"), bool(p, "dblClick")) }],
-  ["hover", { needs: "page", run: (page, p) => hover(page, str(p, "uid")) }],
-  ["fill", { needs: "page", run: (page, p) => fill(page, str(p, "uid"), str(p, "value")) }],
-  ["type", { needs: "page", run: (page, p) => typeText(page, str(p, "text"), optStr(p, "submitKey")) }],
-  ["press", { needs: "page", run: (page, p) => pressKey(page, str(p, "key")) }],
-  ["drag", { needs: "page", run: (page, p) => drag(page, str(p, "from"), str(p, "to")) }],
-  ["upload", { needs: "page", run: (page, p) => uploadFile(page, str(p, "uid"), str(p, "file")) }],
+  ["click", { needs: "page", run: (page, p) => {
+    const uid = str(p, "uid");
+    const dblClick = bool(p, "dblClick");
+    return click(page, uid, dblClick);
+  }}],
+  ["hover", { needs: "page", run: (page, p) => {
+    const uid = str(p, "uid");
+    return hover(page, uid);
+  }}],
+  ["fill", { needs: "page", run: (page, p) => {
+    const uid = str(p, "uid");
+    const value = str(p, "value");
+    return fill(page, uid, value);
+  }}],
+  ["type", { needs: "page", run: (page, p) => {
+    const text = str(p, "text");
+    const submitKey = optStr(p, "submitKey");
+    return typeText(page, text, submitKey);
+  }}],
+  ["press", { needs: "page", run: (page, p) => {
+    const key = str(p, "key");
+    return pressKey(page, key);
+  }}],
+  ["drag", { needs: "page", run: (page, p) => {
+    const from = str(p, "from");
+    const to = str(p, "to");
+    return drag(page, from, to);
+  }}],
+  ["upload", { needs: "page", run: (page, p) => {
+    const uid = str(p, "uid");
+    const file = str(p, "file");
+    return uploadFile(page, uid, file);
+  }}],
   ["fill-form", { needs: "page", run: (page, p) => {
     const fields = p['fields'];
     if (!Array.isArray(fields)) throw new Error("param 'fields' must be an array");
@@ -147,20 +198,28 @@ const commands = new Map<string, CommandDef>([
   ["eval", { needs: "page", run: (page, p) => {
     const args = p['args'];
     if (args !== undefined && !Array.isArray(args)) throw new Error("param 'args' must be an array");
-    return evaluate(page, str(p, "expression"), args);
+    const expression = str(p, "expression");
+    return evaluate(page, expression, args);
   }}],
 
   ["pages", { needs: "browser", run: (browser) => listPages(browser) }],
   ["new-page", { needs: "daemon", run: async (p) => {
-    const session = await getSession(num(p, "port"));
+    const port = num(p, "port");
+    const session = await getSession(port);
     const bg = bool(p, "background");
-    const page = await newPage(session.browser, str(p, "url"), bg, optStr(p, "isolatedContext"), optNum(p, "timeout"));
+    const url = str(p, "url");
+    const isolatedContext = optStr(p, "isolatedContext");
+    const timeout = optNum(p, "timeout");
+    const page = await newPage(session.browser, url, bg, isolatedContext, timeout);
     if (!bg) session.page = page;
-    return JSON.stringify({ url: page.url(), title: await page.title() });
+    const title = await page.title();
+    return JSON.stringify({ url: page.url(), title });
   }}],
   ["close-page", { needs: "daemon", run: async (p) => {
-    const session = await getSession(num(p, "port"));
-    const result = await closePage(session.browser, num(p, "pageId"));
+    const port = num(p, "port");
+    const session = await getSession(port);
+    const pageId = num(p, "pageId");
+    const result = await closePage(session.browser, pageId);
     const pages = await session.browser.pages();
     const firstPage = pages[0];
     if (!firstPage) throw new Error("no pages remaining after close");
@@ -168,14 +227,20 @@ const commands = new Map<string, CommandDef>([
     return result;
   }}],
   ["select-page", { needs: "daemon", run: async (p) => {
-    const session = await getSession(num(p, "port"));
+    const port = num(p, "port");
+    const session = await getSession(port);
     const btf = p['noBringToFront'] ? false : true;
-    const page = await selectPage(session.browser, num(p, "pageId"), btf);
+    const pageId = num(p, "pageId");
+    const page = await selectPage(session.browser, pageId, btf);
     session.page = page;
-    return JSON.stringify({ selected: num(p, "pageId") });
+    return JSON.stringify({ selected: pageId });
   }}],
 
-  ["resize", { needs: "page", run: (page, p) => resizePage(page, num(p, "width"), num(p, "height")) }],
+  ["resize", { needs: "page", run: (page, p) => {
+    const width = num(p, "width");
+    const height = num(p, "height");
+    return resizePage(page, width, height);
+  }}],
 
   ["emulate", { needs: "page", run: (page, p) => {
     const cs = optStr(p, "colorScheme");
@@ -208,32 +273,52 @@ const commands = new Map<string, CommandDef>([
     });
   }}],
 
-  ["wait", { needs: "page", run: (page, p) => waitFor(page, strArr(p, "texts"), num(p, "timeout")) }],
+  ["wait", { needs: "page", run: (page, p) => {
+    const texts = strArr(p, "texts");
+    const timeout = num(p, "timeout");
+    return waitFor(page, texts, timeout);
+  }}],
   ["dialog", { needs: "page", run: (page, p) => {
     const action = str(p, "dialogAction");
     if (action !== "accept" && action !== "dismiss") throw new Error(`invalid dialogAction: ${action}`);
-    return handleDialog(page, action, optStr(p, "promptText"));
+    const promptText = optStr(p, "promptText");
+    return handleDialog(page, action, promptText);
   }}],
 
   ["trace-start", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
     if (traceCaptures.has(port)) throw new Error(`trace already active on port ${port}`);
     const session = await getSession(port);
-    const { capture, result } = await startTrace(session.page, optStr(p, "path"), bool(p, "reload"), bool(p, "autoStop"));
-    if (!bool(p, "autoStop")) traceCaptures.set(port, capture);
+    const path = optStr(p, "path");
+    const doReload = bool(p, "reload");
+    const autoStop = bool(p, "autoStop");
+    const { capture, result } = await startTrace(session.page, path, doReload, autoStop);
+    if (!autoStop) traceCaptures.set(port, capture);
     return result;
   }}],
   ["trace-stop", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
     const capture = traceCaptures.get(port);
     if (!capture) throw new Error(`no active trace on port ${port}`);
-    const result = await stopTrace(capture, optStr(p, "path"));
+    const path = optStr(p, "path");
+    const result = await stopTrace(capture, path);
     traceCaptures.delete(port);
     return result;
   }}],
-  ["trace-analyze", { needs: "daemon", run: (p) => analyzeTrace(str(p, "path")) }],
-  ["trace-analyze-insight", { needs: "daemon", run: (p) => analyzeInsight(str(p, "path"), str(p, "insightSetId"), str(p, "insightName")) }],
-  ["heap-snapshot", { needs: "page", run: (page, p) => takeHeapSnapshot(page, str(p, "path")) }],
+  ["trace-analyze", { needs: "daemon", run: (p) => {
+    const path = str(p, "path");
+    return analyzeTrace(path);
+  }}],
+  ["trace-analyze-insight", { needs: "daemon", run: (p) => {
+    const path = str(p, "path");
+    const insightSetId = str(p, "insightSetId");
+    const insightName = str(p, "insightName");
+    return analyzeInsight(path, insightSetId, insightName);
+  }}],
+  ["heap-snapshot", { needs: "page", run: (page, p) => {
+    const path = str(p, "path");
+    return takeHeapSnapshot(page, path);
+  }}],
 
   ["network-start", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
@@ -247,13 +332,20 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
-    return listNetworkEntries(capture, optStr(p, "type"), bool(p, "includePreserved"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
+    const type = optStr(p, "type");
+    const includePreserved = bool(p, "includePreserved");
+    const pageIdx = optNum(p, "pageIdx");
+    const pageSize = optNum(p, "pageSize");
+    return listNetworkEntries(capture, type, includePreserved, pageIdx, pageSize);
   }}],
   ["network-get", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
     const capture = networkCaptures.get(port);
     if (!capture) throw new Error(`no active network capture on port ${port}`);
-    return getNetworkEntry(capture, num(p, "reqid"), optStr(p, "requestFile"), optStr(p, "responseFile"));
+    const reqid = num(p, "reqid");
+    const requestFile = optStr(p, "requestFile");
+    const responseFile = optStr(p, "responseFile");
+    return getNetworkEntry(capture, reqid, requestFile, responseFile);
   }}],
   ["network-stop", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
@@ -277,13 +369,18 @@ const commands = new Map<string, CommandDef>([
     const port = num(p, "port");
     const capture = consoleCaptures.get(port);
     if (!capture) throw new Error(`no active console capture on port ${port}`);
-    return listConsoleEntries(capture, optStr(p, "type"), bool(p, "includePreserved"), optNum(p, "pageIdx"), optNum(p, "pageSize"));
+    const type = optStr(p, "type");
+    const includePreserved = bool(p, "includePreserved");
+    const pageIdx = optNum(p, "pageIdx");
+    const pageSize = optNum(p, "pageSize");
+    return listConsoleEntries(capture, type, includePreserved, pageIdx, pageSize);
   }}],
   ["console-get", { needs: "daemon", run: (p) => {
     const port = num(p, "port");
     const capture = consoleCaptures.get(port);
     if (!capture) throw new Error(`no active console capture on port ${port}`);
-    return getConsoleEntry(capture.entries, num(p, "msgid"));
+    const msgid = num(p, "msgid");
+    return getConsoleEntry(capture.entries, msgid);
   }}],
   ["console-stop", { needs: "daemon", run: async (p) => {
     const port = num(p, "port");
@@ -302,7 +399,8 @@ const SNAPSHOT_ACTIONS = new Set([
 
 const mergeWithSnapshot = (result: string, snap: string): string => {
   try {
-    const parsedResult = ParamsSchema.parse(JSON.parse(result));
+    const parsed: unknown = JSON.parse(result);
+    const parsedResult = ParamsSchema.parse(parsed);
     return JSON.stringify({ ...parsedResult, snapshot: snap });
   } catch (err) {
     throw new Error(`failed to merge snapshot into response: ${String(err)}`, { cause: err });
@@ -316,7 +414,8 @@ const dispatch = async (params: Params): Promise<string> => {
 
   switch (def.needs) {
     case "page": {
-      const { page } = await getSession(num(params, "port"));
+      const port = num(params, "port");
+      const { page } = await getSession(port);
       const result = await def.run(page, params);
       if (bool(params, "includeSnapshot") && SNAPSHOT_ACTIONS.has(action)) {
         const snap = await snapshot(page, false, undefined);
@@ -325,7 +424,8 @@ const dispatch = async (params: Params): Promise<string> => {
       return result;
     }
     case "browser": {
-      const { browser } = await getSession(num(params, "port"));
+      const browserPort = num(params, "port");
+      const { browser } = await getSession(browserPort);
       return def.run(browser, params);
     }
     case "daemon": {
@@ -345,7 +445,8 @@ const start = () => {
     unix: SOCKET_PATH,
     fetch: async (req) => {
       try {
-        const body = ParamsSchema.parse(await req.json());
+        const rawBody: unknown = await req.json();
+        const body = ParamsSchema.parse(rawBody);
         const result = await dispatch(body);
         return new Response(result, { headers: { "content-type": "application/json" } });
       } catch (err) {

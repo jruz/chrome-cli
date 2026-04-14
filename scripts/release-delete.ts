@@ -65,7 +65,8 @@ const findRelease = async (
   const res = await fetch(url, { headers: headers(token) });
 
   if (res.ok) {
-    return parseId(await res.json());
+    const data: unknown = await res.json();
+    return parseId(data);
   }
 
   if (res.status === 404) {

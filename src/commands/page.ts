@@ -2,13 +2,12 @@ import type { Browser, Page } from "puppeteer-core";
 
 export const listPages = async (browser: Browser): Promise<string> => {
   const pages = await browser.pages();
-  const info = await Promise.all(
-    pages.map(async (p, i) => ({
-      id: i,
-      url: p.url(),
-      title: await p.title(),
-    })),
-  );
+  const mapped = pages.map(async (p, i) => ({
+    id: i,
+    url: p.url(),
+    title: await p.title(),
+  }));
+  const info = await Promise.all(mapped);
   return JSON.stringify(info);
 };
 

@@ -427,29 +427,34 @@ const run = (fn: (opts: Record<string, string>) => Promise<string>) =>
   async (opts: Record<string, string>) => {
     await ensureDaemon();
     try {
-      log.info(await fn(opts));
+      const result = await fn(opts);
+      log.info(result);
     } catch (err) {
       log.error(err instanceof Error ? err.message : String(err));
       process.exit(1);
     }
   };
 
+const version = versionString();
 const program = new Command()
   .name("chrome-cli")
   .description("Control Chrome via CDP (Chrome DevTools Protocol)")
-  .version(versionString());
+  .version(version);
 
+const daemonStartAction = run(async () => send({ action: "status" }));
 program.command("daemon-start")
   .description("Start the background daemon")
-  .action(run(async () => send({ action: "status" })));
+  .action(daemonStartAction);
 
+const daemonStatusAction = run(async () => send({ action: "status" }));
 program.command("daemon-status")
   .description("Show daemon status")
-  .action(run(async () => send({ action: "status" })));
+  .action(daemonStatusAction);
 
+const daemonStopAction = run(async () => send({ action: "shutdown" }));
 program.command("daemon-stop")
   .description("Stop the background daemon")
-  .action(run(async () => send({ action: "shutdown" })));
+  .action(daemonStopAction);
 
 cliCommands.forEach((def) => {
   const cmd = program.command(def.name).description(def.description);
@@ -463,14 +468,16 @@ cliCommands.forEach((def) => {
     else cmd.option(f.flag, f.description);
   });
 
-  cmd.action(run((opts) => {
+  const action = run((opts) => {
     const payload: Record<string, unknown> = { action: def.name };
     if (def.needsPort && opts['port']) {
       payload['port'] = Number(opts['port']);
     }
-    Object.assign(payload, def.toPayload(opts));
+    const extra = def.toPayload(opts);
+    Object.assign(payload, extra);
     return send(payload);
-  }));
+  });
+  cmd.action(action);
 });
 
 if (process.argv.includes("--__daemon")) {

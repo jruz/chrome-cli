@@ -54,32 +54,33 @@ export const killCmd = async (state: DaemonState, port: number): Promise<string>
 };
 
 export const killAllCmd = async (state: DaemonState): Promise<string> => {
-  const entries = Array.from(state.sessions.entries());
-  const killed = await Promise.all(
-    entries.map(async ([port, session]) => {
+  const sessionEntries = state.sessions.entries();
+  const entries = Array.from(sessionEntries);
+  const mapped = entries.map(async ([port, session]) => {
       const pid = await findChromePid(port);
       await cleanupSession(state, port, session);
       if (pid) process.kill(pid, "SIGTERM");
       return { port, pid };
-    }),
-  );
+    });
+  const killed = await Promise.all(mapped);
   return JSON.stringify({ killed });
 };
 
 export const statusCmd = (state: DaemonState): string => {
-  const ports = Array.from(state.sessions.keys());
+  const keys = state.sessions.keys();
+  const ports = Array.from(keys);
   return JSON.stringify({ sessions: ports.length, ports });
 };
 
 export const shutdownCmd = async (state: DaemonState): Promise<string> => {
-  const entries = Array.from(state.sessions.entries());
-  await Promise.all(
-    entries.map(async ([port, session]) => {
+  const sessionEntries = state.sessions.entries();
+  const entries = Array.from(sessionEntries);
+  const tasks = entries.map(async ([port, session]) => {
       await cleanupSession(state, port, session);
       const pid = await findChromePid(port);
       if (pid) process.kill(pid, "SIGTERM");
-    }),
-  );
+    });
+  await Promise.all(tasks);
   setTimeout(() => process.exit(0), 100);
   return JSON.stringify({ shutdown: true });
 };

@@ -28,14 +28,14 @@ export const evaluate = async (
     return arg;
   });
 
-  await Promise.all(
-    validated.map(async (arg) => {
-      const el = await findByUid(page, arg.uid);
-      if (!el) throw new Error(`element not found: ${arg.uid}`);
-    }),
-  );
+  const checks = validated.map(async (arg) => {
+    const el = await findByUid(page, arg.uid);
+    if (!el) throw new Error(`element not found: ${arg.uid}`);
+  });
+  await Promise.all(checks);
 
-  const script = buildEvalScript(expression, validated.map((a) => a.uid));
+  const uids = validated.map((a) => a.uid);
+  const script = buildEvalScript(expression, uids);
   const result = await page.evaluate(script);
   return JSON.stringify({ result });
 };

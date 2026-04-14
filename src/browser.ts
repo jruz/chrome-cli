@@ -58,7 +58,9 @@ const findFreePort = async (maxAttempts: number): Promise<number> => {
 
 export const launch = async (headless: boolean): Promise<{ port: number; userDataDir: string }> => {
   const port = await findFreePort(10);
-  const userDataDir = mkdtempSync(join(tmpdir(), "chrome-cli-"));
+  const tmp = tmpdir();
+  const tmpBase = join(tmp, "chrome-cli-");
+  const userDataDir = mkdtempSync(tmpBase);
   const chromeArgs = [
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${userDataDir}`,
@@ -67,7 +69,8 @@ export const launch = async (headless: boolean): Promise<{ port: number; userDat
     ...(headless ? ["--headless=new"] : []),
   ];
 
-  const child = spawn(chromeExecutable(), chromeArgs, {
+  const chromePath = chromeExecutable();
+  const child = spawn(chromePath, chromeArgs, {
     detached: true,
     stdio: "ignore",
   });
