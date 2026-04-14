@@ -25,6 +25,7 @@ import {
   stopCapture as stopConsoleCapture,
 } from "./commands/console";
 import { launchCmd, killCmd, killAllCmd, statusCmd, shutdownCmd, type DaemonState } from "./commands/lifecycle";
+import { fetchUrl } from "./commands/fetch";
 import { SOCKET_PATH } from "./config";
 import { unlinkSync } from "fs";
 import { z } from "zod";
@@ -126,6 +127,17 @@ const commands = new Map<string, CommandDef>([
   ["kill-all", { needs: "daemon", run: () => killAllCmd(state) }],
   ["status", { needs: "daemon", run: () => statusCmd(state) }],
   ["shutdown", { needs: "daemon", run: () => shutdownCmd(state) }],
+
+  ["fetch", { needs: "daemon", run: (p) => {
+    const url = str(p, "url");
+    const mode = optStr(p, "mode") === "screenshot" ? "screenshot" as const : "snapshot" as const;
+    const timeout = num(p, "timeout");
+    const path = optStr(p, "path");
+    const fullPage = bool(p, "fullPage");
+    const format = str(p, "format");
+    const quality = optNum(p, "quality");
+    return fetchUrl(state, url, mode, timeout, path, fullPage, format, quality);
+  }}],
 
   ["navigate", { needs: "page", run: (page, p) => {
     const bfu = optStr(p, "handleBeforeUnload");
