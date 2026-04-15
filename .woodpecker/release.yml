@@ -1,0 +1,22 @@
+when:
+  - event: tag
+
+steps:
+  - name: BUILD
+    image: bash
+    environment:
+      REVISION: ${CI_COMMIT_SHA}
+    commands:
+      - scripts/release-build.sh linux x64
+      - scripts/release-build.sh linux arm64
+      - scripts/release-build.sh darwin x64
+      - scripts/release-build.sh darwin arm64
+      - ls -la dist/
+
+  - name: RELEASE
+    image: bash
+    environment:
+      CODEBERG_TOKEN:
+        from_secret: CODEBERG_TOKEN
+    commands:
+      - nix develop --command just release-upload ${CI_COMMIT_TAG}
