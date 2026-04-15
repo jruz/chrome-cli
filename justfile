@@ -12,8 +12,17 @@ woodpecker-check:
         .woodpecker/
 
 install:
-    just chrome-build
-    just chrome-install
+    #!/usr/bin/env nu
+    let running = (^chrome-cli daemon-status
+        | from json
+        | get running)
+    if $running {
+        print $"(ansi red)ERROR: daemon is running(ansi reset)"
+        print "stop it first with: chrome-cli daemon-stop"
+        exit 1
+    }
+    ^just chrome-build
+    ^just chrome-install
 
 chrome-run *ARGS:
     bun run cli.ts {{ARGS}}
