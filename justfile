@@ -70,9 +70,6 @@ ts-test:
 deps-install:
     bun install
 
-release VERSION:
-    bun scripts/release.ts {{ VERSION }}
-
 release-upload TAG:
     bun scripts/release-upload.ts {{ TAG }}
 
