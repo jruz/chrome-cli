@@ -3,10 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    nix-editor.url = "github:snowfallorg/nix-editor";
   };
 
-  outputs = { self, nixpkgs, nix-editor, ... }:
+  outputs = { self, nixpkgs, ... }:
     let
       forAllSystems = fn: nixpkgs.lib.genAttrs [
         "aarch64-darwin"
@@ -16,17 +15,12 @@
       ] (system: fn (import nixpkgs { inherit system; }));
     in
     {
-      packages = forAllSystems (pkgs: {
-        default = pkgs.callPackage ./default.nix {};
-      });
-
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
             pkgs.bun
             pkgs.just
             pkgs.nushell
-            nix-editor.packages.${pkgs.system}.default
             pkgs.woodpecker-cli
           ];
 
