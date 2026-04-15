@@ -7,6 +7,7 @@ steps:
     environment:
       REVISION: ${CI_COMMIT_SHA}
     commands:
+      - nix develop --command just setup
       - nix develop --command just release-build linux x64
       - nix develop --command just release-build linux arm64
       - nix develop --command just release-build darwin x64
