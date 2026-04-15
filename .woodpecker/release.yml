@@ -7,10 +7,10 @@ steps:
     environment:
       REVISION: ${CI_COMMIT_SHA}
     commands:
-      - scripts/release-build.sh linux x64
-      - scripts/release-build.sh linux arm64
-      - scripts/release-build.sh darwin x64
-      - scripts/release-build.sh darwin arm64
+      - nix develop --command just release-build linux x64
+      - nix develop --command just release-build linux arm64
+      - nix develop --command just release-build darwin x64
+      - nix develop --command just release-build darwin arm64
       - ls -la dist/
 
   - name: RELEASE

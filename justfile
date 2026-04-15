@@ -70,6 +70,23 @@ ts-test:
 deps-install:
     bun install
 
+release-build OS ARCH:
+    #!/usr/bin/env nu
+    if ($env.REVISION? | is-empty) {
+        error make {msg: "ERROR: REVISION is not set"}
+    }
+    let name = (open package.json | get name)
+    let target = "bun-{{ OS }}-{{ ARCH }}"
+    let outfile = $"dist/($name)-{{ OS }}-{{ ARCH }}"
+    let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
+    mkdir dist
+    (^bun build cli.ts
+        --compile
+        --target $target
+        --outfile $outfile
+        --define $"process.env.REVISION='($env.REVISION)'"
+        --define $"process.env.BUILD_TIME='($bt)'")
+
 release-bump VERSION:
     nu scripts/release-bump.nu {{ VERSION }}
 
