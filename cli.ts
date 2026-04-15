@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { log } from "./src/log";
-import { ensureDaemon, send } from "./src/client";
+import { ensureDaemon, isDaemonRunning, send, startDaemon, stopDaemon } from "./src/client";
 import { versionString } from "./src/version";
 
 type Flag = {
@@ -458,23 +458,82 @@ const run = (fn: (opts: Record<string, string>) => Promise<string>) =>
     }
   };
 
+const parseJson = (raw: string): Record<string, unknown> => {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("expected object response");
+    }
+    const entries = Object.entries(parsed);
+    return Object.fromEntries(entries);
+  } catch (err) {
+    throw new Error(`invalid daemon response: ${String(err)}`, { cause: err });
+  }
+};
+
+const withRunning = (raw: string, running: boolean): string => {
+  const parsed = parseJson(raw);
+  return JSON.stringify({ running, ...parsed });
+};
+
+const runDaemon = (fn: () => Promise<string>) =>
+  async () => {
+    try {
+      const result = await fn();
+      log.info(result);
+    } catch (err) {
+      log.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  };
+
 const version = versionString();
 const program = new Command()
   .name("chrome-cli")
   .description("Control Chrome via CDP (Chrome DevTools Protocol)")
   .version(version);
 
-const daemonStartAction = run(async () => send({ action: "status" }));
+const daemonStartAction = runDaemon(async () => {
+  const running = await isDaemonRunning();
+  if (running) {
+    const status = await send({ action: "status" });
+    const payload = withRunning(status, true);
+    const parsed = parseJson(payload);
+    return JSON.stringify({ started: false, ...parsed });
+  }
+
+  await startDaemon();
+  const status = await send({ action: "status" });
+  const payload = withRunning(status, true);
+  const parsed = parseJson(payload);
+  return JSON.stringify({ started: true, ...parsed });
+});
 program.command("daemon-start")
   .description("Start the background daemon")
   .action(daemonStartAction);
 
-const daemonStatusAction = run(async () => send({ action: "status" }));
+const daemonStatusAction = runDaemon(async () => {
+  const running = await isDaemonRunning();
+  if (!running) {
+    return JSON.stringify({ running: false });
+  }
+
+  const status = await send({ action: "status" });
+  return withRunning(status, true);
+});
 program.command("daemon-status")
   .description("Show daemon status")
   .action(daemonStatusAction);
 
-const daemonStopAction = run(async () => send({ action: "shutdown" }));
+const daemonStopAction = runDaemon(async () => {
+  const running = await isDaemonRunning();
+  if (!running) {
+    throw new Error("daemon is not running");
+  }
+
+  const result = await stopDaemon();
+  return withRunning(result, false);
+});
 program.command("daemon-stop")
   .description("Stop the background daemon")
   .action(daemonStopAction);

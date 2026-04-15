@@ -39,6 +39,25 @@ export const isDaemonRunning = async (): Promise<boolean> => {
   }
 };
 
+const sleep = async (ms: number): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+const waitForDaemonState = async (
+  expectedRunning: boolean,
+  timeoutMs: number,
+): Promise<void> => {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const running = await isDaemonRunning();
+    if (running === expectedRunning) return;
+    await sleep(50);
+  }
+
+  const action = expectedRunning ? "start" : "stop";
+  throw new Error(`daemon failed to ${action} within ${timeoutMs}ms`);
+};
+
 const daemonCommand = (): string[] => {
   const main = Bun.main;
   if (main !== process.execPath) {
@@ -55,13 +74,13 @@ export const startDaemon = async (): Promise<void> => {
   });
   proc.unref();
 
-  const start = Date.now();
-  while (Date.now() - start < 5000) {
-    const running = await isDaemonRunning();
-    if (running) return;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error("daemon failed to start within 5000ms");
+  await waitForDaemonState(true, 5000);
+};
+
+export const stopDaemon = async (): Promise<string> => {
+  const result = await send({ action: "shutdown" });
+  await waitForDaemonState(false, 5000);
+  return result;
 };
 
 export const ensureDaemon = async (): Promise<void> => {
