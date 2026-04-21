@@ -25,16 +25,22 @@ import {
   stopCapture as stopConsoleCapture,
 } from "./commands/console";
 import { launchCmd, killCmd, killAllCmd, statusCmd, shutdownCmd, type DaemonState } from "./commands/lifecycle";
-import { fetchUrl } from "./commands/fetch";
+import { oneshot } from "./commands/oneshot";
 import { SOCKET_PATH } from "./config";
 import { unlinkSync } from "fs";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 
 const keySchema = z.string();
 const valSchema = z.unknown();
 const ParamsSchema = z.record(keySchema, valSchema);
 
 type Params = z.infer<typeof ParamsSchema>;
+
+const toErrorMessage = (err: unknown): string => {
+  if (err instanceof ZodError) return err.issues.map((i) => i.message).join("; ");
+  if (err instanceof Error) return err.message;
+  return String(err);
+};
 
 type CommandResult = Promise<string> | string;
 
@@ -128,20 +134,24 @@ const commands = new Map<string, CommandDef>([
   ["status", { needs: "daemon", run: () => statusCmd(state) }],
   ["shutdown", { needs: "daemon", run: () => shutdownCmd(state) }],
 
-  ["fetch", { needs: "daemon", run: (p) => {
+  ["oneshot", { needs: "daemon", run: (p) => {
     const url = str(p, "url");
-    const mode = optStr(p, "mode") === "screenshot" ? "screenshot" as const : "snapshot" as const;
-    const timeout = num(p, "timeout");
+    const mode = z.enum(["snapshot", "screenshot"]).parse(p["mode"]);
+    const timeout = optNum(p, "timeout");
     const path = optStr(p, "path");
-    const fullPage = bool(p, "fullPage");
-    const format = str(p, "format");
+    const verbose = bool(p, "verbose");
+    const fullPage = p["fullPage"] !== undefined ? bool(p, "fullPage") : undefined;
+    const format = optStr(p, "format");
     const quality = optNum(p, "quality");
-    return fetchUrl(state, url, mode, timeout, path, fullPage, format, quality);
+    const width = optNum(p, "width");
+    const height = optNum(p, "height");
+    return oneshot(state, { url, mode, timeout, path, verbose, fullPage, format, quality, width, height });
   }}],
 
   ["navigate", { needs: "page", run: (page, p) => {
-    const bfu = optStr(p, "handleBeforeUnload");
-    if (bfu !== undefined && bfu !== "accept" && bfu !== "decline") throw new Error(`invalid handleBeforeUnload: ${bfu}`);
+    const bfu = p["handleBeforeUnload"] !== undefined
+      ? z.enum(["accept", "decline"]).parse(p["handleBeforeUnload"])
+      : undefined;
     const url = str(p, "url");
     const timeout = num(p, "timeout");
     const initScript = optStr(p, "initScript");
@@ -255,8 +265,9 @@ const commands = new Map<string, CommandDef>([
   }}],
 
   ["emulate", { needs: "page", run: (page, p) => {
-    const cs = optStr(p, "colorScheme");
-    if (cs !== undefined && cs !== "dark" && cs !== "light" && cs !== "auto") throw new Error(`invalid colorScheme: ${cs}`);
+    const cs = p["colorScheme"] !== undefined
+      ? z.enum(["dark", "light", "auto"]).parse(p["colorScheme"])
+      : undefined;
     const vp = p['viewport'];
     const geo = p['geolocation'];
     const ua = optStr(p, "userAgent");
@@ -291,8 +302,7 @@ const commands = new Map<string, CommandDef>([
     return waitFor(page, texts, timeout);
   }}],
   ["dialog", { needs: "page", run: (page, p) => {
-    const action = str(p, "dialogAction");
-    if (action !== "accept" && action !== "dismiss") throw new Error(`invalid dialogAction: ${action}`);
+    const action = z.enum(["accept", "dismiss"]).parse(p["dialogAction"]);
     const promptText = optStr(p, "promptText");
     return handleDialog(page, action, promptText);
   }}],
@@ -462,7 +472,7 @@ const start = () => {
         const result = await dispatch(body);
         return new Response(result, { headers: { "content-type": "application/json" } });
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
+        const message = toErrorMessage(err);
         return new Response(JSON.stringify({ error: message }), { status: 500 });
       }
     },

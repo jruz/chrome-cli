@@ -62,7 +62,7 @@ CI release workflow via Woodpecker. To release a new version:
 ## Commands
 
 ```
-chrome-cli fetch --url <url> --timeout <ms> --format <format> [--screenshot] [--path <file>] [--full-page] [--quality <n>]
+chrome-cli oneshot --url <url> --mode snapshot|screenshot [--timeout <ms>] [--path <file>] [--verbose] [--full-page] [--format <format>] [--quality <n>] [--width <px>] [--height <px>]
 chrome-cli launch [--headed]
 chrome-cli kill --port <port>
 chrome-cli kill-all

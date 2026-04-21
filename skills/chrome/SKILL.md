@@ -7,14 +7,15 @@ description: Debug UI with chrome-cli via CDP. Use when visually verifying chang
 
 Use `chrome-cli` to control Chrome via CDP for visual verification during development.
 
-## One-shot Fetch
+## One-shot
 
 For quick content retrieval without managing browser lifecycle:
 
-- Text: `chrome-cli fetch --url <url> --timeout 30000 --format png`
-- Screenshot: `chrome-cli fetch --url <url> --timeout 30000 --format png --screenshot --path /tmp/page.png`
-- Full page: `chrome-cli fetch --url <url> --timeout 30000 --format png --screenshot --full-page --path /tmp/page.png`
+- Text: `chrome-cli oneshot --url <url> --mode snapshot`
+- Screenshot: `chrome-cli oneshot --url <url> --mode screenshot --path /tmp/page.png`
+- Verbose text: `chrome-cli oneshot --url <url> --mode snapshot --verbose`
 
+Defaults: timeout 30s, viewport 1366x768, png format, full-page screenshots.
 Uses `networkidle0` wait strategy — works with SPAs.
 
 ## Multi-step Debug Workflow
@@ -30,7 +31,7 @@ Uses `networkidle0` wait strategy — works with SPAs.
 
 | Command                 | Purpose                       | Key Flags                                                                                                       |
 | ----------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `fetch`                 | One-shot page fetch           | `--url --timeout --format [--screenshot] [--path] [--full-page] [--quality]`                                    |
+| `oneshot`               | One-shot page capture         | `--url --mode [--timeout] [--path] [--verbose] [--full-page] [--format] [--quality] [--width] [--height]`       |
 | `launch`                | Start Chrome instance         | `--headed`                                                                                                      |
 | `kill`                  | Stop Chrome instance          | `--port`                                                                                                        |
 | `kill-all`              | Stop all instances            |                                                                                                                 |
