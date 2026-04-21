@@ -3,15 +3,49 @@ import { spawn } from "child_process";
 import { mkdtempSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { Launcher } from "chrome-launcher";
+import { accessSync } from "fs";
+
+const DARWIN_PATHS = [
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+];
+
+const LINUX_NAMES = [
+  "google-chrome-stable",
+  "google-chrome",
+  "chromium-browser",
+  "chromium",
+];
+
+const canAccess = (path: string): boolean => {
+  try {
+    accessSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const findDarwin = (): string | undefined =>
+  DARWIN_PATHS.find(canAccess);
+
+const findLinux = (): string | undefined => {
+  for (const name of LINUX_NAMES) {
+    const resolved = Bun.which(name);
+    if (resolved) return resolved;
+  }
+  return undefined;
+};
 
 const chromeExecutable = (): string => {
-  const installations = Launcher.getInstallations();
-  const first = installations[0];
-  if (!first) {
-    throw new Error("chrome/chromium not found");
-  }
-  return first;
+  const envPath = process.env['CHROME_PATH'];
+  if (envPath && canAccess(envPath)) return envPath;
+
+  const found = process.platform === "darwin" ? findDarwin() : findLinux();
+  if (found) return found;
+
+  throw new Error("chrome/chromium not found — set CHROME_PATH or install Chrome/Chromium");
 };
 
 export type Session = {
