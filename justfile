@@ -2,9 +2,14 @@ setup:
     just deps-install
 
 check:
-    just ts-check
-    just ts-lint
-    just woodpecker-check
+    #!/usr/bin/env nu
+    ^just sandbox-check
+    ^just ts-check
+    ^just ts-lint
+    ^just woodpecker-check
+
+sandbox-check:
+    sandbox bun scripts/sandbox-check.ts
 
 woodpecker-check:
     woodpecker-cli lint \
@@ -25,13 +30,13 @@ install:
     ^just chrome-install
 
 chrome-run *ARGS:
-    bun run cli.ts {{ARGS}}
+    sandbox bun run cli.ts {{ARGS}}
 
 chrome-launch:
-    bun run cli.ts launch
+    sandbox bun run cli.ts launch
 
 chrome-launch-headed:
-    bun run cli.ts launch --headed
+    sandbox bun run cli.ts launch --headed
 
 chrome-build:
     #!/usr/bin/env nu
@@ -39,7 +44,7 @@ chrome-build:
         error make {msg: "ERROR: REVISION is not set"}
     }
     let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
-    (^bun build cli.ts
+    (^sandbox bun build cli.ts
         --compile
         --outfile dist/chrome-cli
         --define $"process.env.REVISION='($env.REVISION)'"
@@ -50,25 +55,25 @@ chrome-install:
     cp dist/chrome-cli ~/.local/bin/chrome-cli
 
 chrome-bench:
-    bun run bench.ts
+    sandbox bun run bench.ts
 
 ts-check:
-    bun run tsc --noEmit
+    sandbox bun run tsc --noEmit
 
 ts-lint:
-    bun run eslint .
+    sandbox bun run eslint .
 
 fix:
     just ts-fix
 
 ts-fix:
-    bun run eslint --fix .
+    sandbox bun run eslint --fix .
 
 ts-test:
-    bun test
+    sandbox bun test
 
 deps-install:
-    bun install
+    sandbox bun install
 
 release-build OS ARCH:
     #!/usr/bin/env nu
@@ -80,7 +85,7 @@ release-build OS ARCH:
     let outfile = $"dist/($name)-{{ OS }}-{{ ARCH }}"
     let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
     mkdir dist
-    (^bun build cli.ts
+    (^sandbox bun build cli.ts
         --compile
         --target $target
         --outfile $outfile
@@ -91,7 +96,7 @@ release-bump VERSION:
     nu scripts/release-bump.nu {{ VERSION }}
 
 release-upload TAG:
-    bun scripts/release-upload.ts {{ TAG }}
+    sandbox bun scripts/release-upload.ts {{ TAG }}
 
 release-delete TAG:
-    bun scripts/release-delete.ts {{ TAG }}
+    sandbox bun scripts/release-delete.ts {{ TAG }}
