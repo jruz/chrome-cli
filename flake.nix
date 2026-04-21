@@ -2,35 +2,39 @@
   description = "CLI tool for controlling Chrome via CDP";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, ... }:
-    let
-      forAllSystems = fn: nixpkgs.lib.genAttrs [
-        "aarch64-darwin"
-        "x86_64-darwin"
-        "aarch64-linux"
-        "x86_64-linux"
-      ] (system: fn (import nixpkgs { inherit system; }));
-    in
+  outputs =
     {
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
+      self,
+      nixpkgs,
+      unstable,
+      flake-utils,
+      ...
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        unstablePkgs = import unstable { inherit system; };
+      in
+      {
+        devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.bun
-            pkgs.just
-            pkgs.nushell
+            unstablePkgs.bun
             pkgs.woodpecker-cli
           ];
 
           shellHook = ''
             echo ""
-            echo "  Bun: ${pkgs.bun.version}"
+            echo "  Bun: ${unstablePkgs.bun.version}"
             echo "  Woodpecker CLI: ${pkgs.woodpecker-cli.version}"
             echo ""
           '';
         };
-      });
-    };
+      }
+    );
 }
