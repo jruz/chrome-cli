@@ -18,16 +18,19 @@ woodpecker-check:
 
 install:
     #!/usr/bin/env nu
-    let running = (^chrome-cli daemon-status
-        | from json
-        | get running)
-    if $running {
-        print $"(ansi red)ERROR: daemon is running(ansi reset)"
-        print "stop it first with: chrome-cli daemon-stop"
-        exit 1
-    }
+    ^just chrome-daemon-check
     ^just chrome-build
     ^just chrome-install
+
+chrome-daemon-check:
+    #!/usr/bin/env nu
+    let binary = ("~/.local/bin/chrome-cli" | path expand)
+    if not ($binary | path exists) { exit 0 }
+    let running = (^$binary daemon-status | from json | get running)
+    if not $running { exit 0 }
+    print --stderr $"(ansi red)ERROR: daemon is running(ansi reset)"
+    print --stderr "stop it first with: chrome-cli daemon-stop"
+    exit 1
 
 chrome-run *ARGS:
     sandbox bun run cli.ts {{ARGS}}
