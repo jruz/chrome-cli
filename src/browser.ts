@@ -1,6 +1,5 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
-import { spawn } from "child_process";
-import { mkdtempSync } from "fs";
+import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { accessSync } from "fs";
@@ -55,64 +54,36 @@ export type Session = {
   userDataDir: string;
 };
 
-const tryDebugPort = async (port: number): Promise<boolean> => {
+const launchBrowser = async (headless: boolean, userDataDir: string): Promise<Browser> => {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
-    return res.ok;
-  } catch {
-    return false;
+    return await puppeteer.launch({
+      executablePath: chromeExecutable(),
+      userDataDir,
+      headless,
+      timeout: 10000,
+      handleSIGINT: false,
+      handleSIGTERM: false,
+      handleSIGHUP: false,
+    });
+  } catch (error) {
+    rmSync(userDataDir, { recursive: true });
+    throw error;
   }
 };
 
-const waitForDebugPort = async (port: number, timeoutMs: number): Promise<void> => {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (await tryDebugPort(port)) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`Chrome did not start on port ${port} within ${timeoutMs}ms`);
-};
-
-const isPortFree = async (port: number): Promise<boolean> => {
-  try {
-    await fetch(`http://127.0.0.1:${port}/json/version`);
-    return false;
-  } catch {
-    return true;
-  }
-};
-
-const findFreePort = async (maxAttempts: number): Promise<number> => {
-  for (let i = 0; i < maxAttempts; i++) {
-    const candidate = 9222 + Math.floor(Math.random() * 1000);
-    if (await isPortFree(candidate)) return candidate;
-  }
-  throw new Error(`failed to find free debug port after ${maxAttempts} attempts`);
-};
-
-export const launch = async (headless: boolean): Promise<{ port: number; userDataDir: string }> => {
-  const port = await findFreePort(10);
+export const launch = async (headless: boolean): Promise<Session> => {
   const tmp = tmpdir();
   const tmpBase = join(tmp, "chrome-cli-");
   const userDataDir = mkdtempSync(tmpBase);
-  const chromeArgs = [
-    `--remote-debugging-port=${port}`,
-    `--user-data-dir=${userDataDir}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    ...(headless ? ["--headless=new"] : []),
-  ];
-
-  const chromePath = chromeExecutable();
-  const child = spawn(chromePath, chromeArgs, {
-    detached: true,
-    stdio: "ignore",
-  });
-  child.unref();
-
-  await waitForDebugPort(port, 10000);
-
-  return { port, userDataDir };
+  const browser = await launchBrowser(headless, userDataDir);
+  const port = Number(new URL(browser.wsEndpoint()).port);
+  try {
+    return await createSession(browser, port, userDataDir);
+  } catch (error) {
+    await close(browser, port);
+    rmSync(userDataDir, { recursive: true });
+    throw error;
+  }
 };
 
 export const isAlive = async (port: number): Promise<boolean> => {
@@ -124,24 +95,37 @@ export const isAlive = async (port: number): Promise<boolean> => {
   }
 };
 
-export const connect = async (port: number, userDataDir: string): Promise<Session> => {
-  const browser = await puppeteer.connect({
-    browserURL: `http://127.0.0.1:${port}`,
-  });
+const createSession = async (browser: Browser, port: number, userDataDir: string): Promise<Session> => {
   const pages = await browser.pages();
   const first = pages[0];
   if (!first) throw new Error(`no pages found on port ${port}`);
   return { browser, page: first, port, userDataDir };
 };
 
-export const findChromePid = async (port: number): Promise<number | null> => {
-  const proc = Bun.spawn(["lsof", "-ti", `:${port}`], { stdout: "pipe", stderr: "pipe" });
-  const text = await new Response(proc.stdout).text();
-  const code = await proc.exited;
-  if (code !== 0) return null;
-  const firstLine = text.trim().split("\n")[0];
-  if (!firstLine) return null;
-  const pid = parseInt(firstLine, 10);
-  if (isNaN(pid)) return null;
-  return pid;
+export const connect = async (port: number, userDataDir: string): Promise<Session> => {
+  const browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${port}` });
+  try {
+    return await createSession(browser, port, userDataDir);
+  } catch (error) {
+    await browser.disconnect();
+    throw error;
+  }
+};
+
+const waitForClosedPort = async (port: number, deadline: number): Promise<void> => {
+  if (!await isAlive(port)) return;
+  if (Date.now() >= deadline) throw new Error(`Chrome still responding on port ${port}`);
+  await Bun.sleep(50);
+  await waitForClosedPort(port, deadline);
+};
+
+export const close = async (browser: Browser, port: number): Promise<number> => {
+  const client = await browser.target().createCDPSession();
+  const { processInfo } = await client.send("SystemInfo.getProcessInfo");
+  await client.detach();
+  const processInfoBrowser = processInfo.find((info) => info.type === "browser");
+  if (!processInfoBrowser) throw new Error(`no browser process on port ${port}`);
+  await browser.close();
+  await waitForClosedPort(port, Date.now() + 10000);
+  return processInfoBrowser.id;
 };

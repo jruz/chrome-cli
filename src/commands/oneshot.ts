@@ -1,4 +1,4 @@
-import { launch as launchChrome, connect } from "../browser";
+import { launch as launchChrome } from "../browser";
 import { snapshot } from "./snapshot";
 import { screenshot } from "./snapshot";
 import type { DaemonState } from "./lifecycle";
@@ -35,8 +35,8 @@ export const oneshot = async (
   const format = opts.format ?? SCREENSHOT_FORMAT;
   const fullPage = opts.mode === "screenshot" ? (opts.fullPage ?? SCREENSHOT_FULL_PAGE) : false;
 
-  const { port, userDataDir } = await launchChrome(true);
-  const session = await connect(port, userDataDir);
+  const session = await launchChrome(true);
+  const { port } = session;
   state.sessions.set(port, session);
 
   try {
