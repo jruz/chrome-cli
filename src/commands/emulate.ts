@@ -19,11 +19,36 @@ type NetworkParams = {
 };
 
 const networkPresets: Record<NetworkPreset, NetworkParams> = {
-  "Offline": { offline: true, downloadThroughput: 0, uploadThroughput: 0, latency: 0 },
-  "Slow 3G": { offline: false, downloadThroughput: 50000, uploadThroughput: 50000, latency: 2000 },
-  "Fast 3G": { offline: false, downloadThroughput: 180000, uploadThroughput: 84375, latency: 562 },
-  "Slow 4G": { offline: false, downloadThroughput: 400000, uploadThroughput: 150000, latency: 300 },
-  "Fast 4G": { offline: false, downloadThroughput: 3000000, uploadThroughput: 1500000, latency: 100 },
+  Offline: {
+    offline: true,
+    downloadThroughput: 0,
+    uploadThroughput: 0,
+    latency: 0,
+  },
+  "Slow 3G": {
+    offline: false,
+    downloadThroughput: 50000,
+    uploadThroughput: 50000,
+    latency: 2000,
+  },
+  "Fast 3G": {
+    offline: false,
+    downloadThroughput: 180000,
+    uploadThroughput: 84375,
+    latency: 562,
+  },
+  "Slow 4G": {
+    offline: false,
+    downloadThroughput: 400000,
+    uploadThroughput: 150000,
+    latency: 300,
+  },
+  "Fast 4G": {
+    offline: false,
+    downloadThroughput: 3000000,
+    uploadThroughput: 1500000,
+    latency: 100,
+  },
 };
 
 const isNetworkPreset = (v: string): v is NetworkPreset => v in networkPresets;
@@ -37,7 +62,10 @@ type EmulateOptions = {
   networkConditions?: string;
 };
 
-const applyViewport = async (page: Page, viewport: ViewportOptions | "reset"): Promise<void> => {
+const applyViewport = async (
+  page: Page,
+  viewport: ViewportOptions | "reset",
+): Promise<void> => {
   if (viewport === "reset") {
     const client = await page.createCDPSession();
     await client.send("Emulation.clearDeviceMetricsOverride");
@@ -57,7 +85,10 @@ const applyUserAgent = async (page: Page, userAgent: string): Promise<void> => {
   await client.detach();
 };
 
-const applyGeolocation = async (page: Page, geolocation: { latitude: number; longitude: number } | "reset"): Promise<void> => {
+const applyGeolocation = async (
+  page: Page,
+  geolocation: { latitude: number; longitude: number } | "reset",
+): Promise<void> => {
   const client = await page.createCDPSession();
   if (geolocation === "reset") {
     await client.send("Emulation.clearGeolocationOverride");
@@ -71,7 +102,10 @@ const applyGeolocation = async (page: Page, geolocation: { latitude: number; lon
   await client.detach();
 };
 
-const applyColorScheme = async (page: Page, colorScheme: "dark" | "light" | "auto"): Promise<void> => {
+const applyColorScheme = async (
+  page: Page,
+  colorScheme: "dark" | "light" | "auto",
+): Promise<void> => {
   if (colorScheme === "auto") {
     await page.emulateMediaFeatures([]);
     return;
@@ -87,7 +121,10 @@ const applyNetwork = async (page: Page, conditions: string): Promise<void> => {
 
   if (conditions === "No emulation") {
     await client.send("Network.emulateNetworkConditions", {
-      offline: false, downloadThroughput: -1, uploadThroughput: -1, latency: 0,
+      offline: false,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+      latency: 0,
     });
     await client.detach();
     return;
@@ -98,7 +135,10 @@ const applyNetwork = async (page: Page, conditions: string): Promise<void> => {
     throw new Error(`invalid network preset: ${conditions}`);
   }
 
-  await client.send("Network.emulateNetworkConditions", networkPresets[conditions]);
+  await client.send(
+    "Network.emulateNetworkConditions",
+    networkPresets[conditions],
+  );
   await client.detach();
 };
 
@@ -130,7 +170,9 @@ export const emulate = async (
 
   if (options.cpuThrottlingRate !== undefined) {
     const client = await page.createCDPSession();
-    await client.send("Emulation.setCPUThrottlingRate", { rate: options.cpuThrottlingRate });
+    await client.send("Emulation.setCPUThrottlingRate", {
+      rate: options.cpuThrottlingRate,
+    });
     await client.detach();
     applied.push("cpuThrottlingRate");
   }

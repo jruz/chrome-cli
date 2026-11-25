@@ -1,7 +1,19 @@
 [repository]
 name = "chrome-cli"
 owner = "jruz"
-topics = ["ai", "ai-agents", "agents", "browser-automation", "cdp", "chrome", "claude", "claude-code", "cli", "codex", "devtools-protocol"]
+topics = [
+  "ai",
+  "ai-agents",
+  "agents",
+  "browser-automation",
+  "cdp",
+  "chrome",
+  "claude",
+  "claude-code",
+  "cli",
+  "codex",
+  "devtools-protocol",
+]
 
 [repository.settings]
 allow_fast_forward_only_merge = true

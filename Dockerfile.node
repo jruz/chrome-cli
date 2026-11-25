@@ -1,0 +1,17 @@
+# check=skip=InvalidDefaultArgInFrom
+ARG NODE_VERSION
+FROM node:${NODE_VERSION}-slim
+
+ARG PNPM_VERSION
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --global pnpm@${PNPM_VERSION}
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update \
+    && apt-get install --yes --no-install-recommends chromium \
+    && printf '%s\n' '#!/bin/sh' 'exec /usr/bin/chromium --no-sandbox "$@"' \
+        > /usr/local/bin/chromium-test \
+    && chmod 755 /usr/local/bin/chromium-test
+
+WORKDIR /app

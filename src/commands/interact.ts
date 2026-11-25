@@ -20,9 +20,7 @@ export const findByUid = async (
   const client = await page.createCDPSession();
   try {
     const { nodes } = await client.send("Accessibility.getFullAXTree");
-    const axNode = nodes.find(
-      (n: { nodeId: string }) => n.nodeId === uid,
-    );
+    const axNode = nodes.find((n: { nodeId: string }) => n.nodeId === uid);
     if (!axNode) return null;
     const backendId = axNode.backendDOMNodeId;
     if (backendId === undefined) return null;
@@ -96,10 +94,7 @@ export const typeText = async (
   return JSON.stringify({ typed: text, submitKey });
 };
 
-export const pressKey = async (
-  page: Page,
-  key: string,
-): Promise<string> => {
+export const pressKey = async (page: Page, key: string): Promise<string> => {
   const input = toKeyInput(key);
   await page.keyboard.press(input);
   return JSON.stringify({ pressed: key });
@@ -125,10 +120,7 @@ export const drag = async (
     fromBox.y + fromBox.height / 2,
   );
   await page.mouse.down();
-  await page.mouse.move(
-    toBox.x + toBox.width / 2,
-    toBox.y + toBox.height / 2,
-  );
+  await page.mouse.move(toBox.x + toBox.width / 2, toBox.y + toBox.height / 2);
   await page.mouse.up();
 
   return JSON.stringify({ dragged: { from: fromUid, to: toUid } });
@@ -137,9 +129,12 @@ export const drag = async (
 type FieldEntry = { uid: string; value: string };
 
 const isFieldEntry = (v: unknown): v is FieldEntry =>
-  typeof v === "object" && v !== null &&
-  "uid" in v && typeof v.uid === "string" &&
-  "value" in v && typeof v.value === "string";
+  typeof v === "object" &&
+  v !== null &&
+  "uid" in v &&
+  typeof v.uid === "string" &&
+  "value" in v &&
+  typeof v.value === "string";
 
 const fillOne = async (page: Page, field: FieldEntry) => {
   const el = await findByUid(page, field.uid);
@@ -154,18 +149,13 @@ export const fillForm = async (
   fields: unknown[],
 ): Promise<string> => {
   const validated = fields.map((field) => {
-    if (!isFieldEntry(field)) throw new Error(`invalid field entry: ${JSON.stringify(field)}`);
+    if (!isFieldEntry(field))
+      throw new Error(`invalid field entry: ${JSON.stringify(field)}`);
     return field;
   });
 
-  const initial = Promise.resolve(new Array<{ uid: string; value: string }>());
-  const results = await validated.reduce(
-    async (accP, field) => {
-      const acc = await accP;
-      const result = await fillOne(page, field);
-      return [...acc, result];
-    },
-    initial,
+  const results = await Array.fromAsync(validated, (field) =>
+    fillOne(page, field),
   );
 
   return JSON.stringify({ filled: results });

@@ -28,14 +28,28 @@ const timeOp = async (fn: () => Promise<unknown>): Promise<number[]> => {
   return times;
 };
 
-const stats = (operation: string, method: string, times: number[]): BenchResult => {
+const sumTimes = (
+  times: readonly number[],
+  index: number,
+  total: number,
+): number => {
+  const time = times[index];
+  if (time === undefined) return total;
+  return sumTimes(times, index + 1, total + time);
+};
+
+const stats = (
+  operation: string,
+  method: string,
+  times: number[],
+): BenchResult => {
   const minVal = Math.min(...times);
   const maxVal = Math.max(...times);
   return {
     operation,
     method,
     times: times.map((t) => Math.round(t)),
-    avg: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
+    avg: Math.round(sumTimes(times, 0, 0) / times.length),
     min: Math.round(minVal),
     max: Math.round(maxVal),
   };
@@ -65,7 +79,12 @@ const main = async () => {
     log.error(`failed to parse launch response: ${portStr} (${String(err)})`);
     process.exit(1);
   }
-  if (typeof parsed !== "object" || parsed === null || !("port" in parsed) || typeof parsed.port !== "number") {
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    !("port" in parsed) ||
+    typeof parsed.port !== "number"
+  ) {
     log.error(`unexpected launch response: ${portStr}`);
     process.exit(1);
   }
@@ -75,61 +94,84 @@ const main = async () => {
 
   const results: BenchResult[] = [];
 
-  // --- CLI (subprocess → daemon) benchmarks ---
-
-  const cliNav = await runCli(`navigate --port ${port} --url ${TARGET_URL} --timeout 30000`);
+  const cliNav = await runCli(
+    `navigate --port ${port} --url ${TARGET_URL} --timeout 30000`,
+  );
   const cliNavStats = stats("navigate", "cli", cliNav);
   results.push(cliNavStats);
   const cliSnap = await runCli(`snapshot --port ${port}`);
   const cliSnapStats = stats("snapshot", "cli", cliSnap);
   results.push(cliSnapStats);
-  const cliShot = await runCli(`screenshot --port ${port} --path /tmp/bench-shot.png`);
+  const cliShot = await runCli(
+    `screenshot --port ${port} --path /tmp/bench-shot.png`,
+  );
   const cliShotStats = stats("screenshot", "cli", cliShot);
   results.push(cliShotStats);
-  const cliEval = await runCli(`eval --port ${port} --expression document.title`);
+  const cliEval = await runCli(
+    `eval --port ${port} --expression document.title`,
+  );
   const cliEvalStats = stats("eval", "cli", cliEval);
   results.push(cliEvalStats);
   const cliPages = await runCli(`pages --port ${port}`);
   const cliPagesStats = stats("pages", "cli", cliPages);
   results.push(cliPagesStats);
 
-  // --- Daemon (in-process Unix socket) benchmarks ---
-
-  const daemonNav = await timeOp(() => send({ action: "navigate", port, url: TARGET_URL, timeout: 30000 }));
+  const daemonNav = await timeOp(() =>
+    send({ action: "navigate", port, url: TARGET_URL, timeout: 30000 }),
+  );
   const daemonNavStats = stats("navigate", "daemon", daemonNav);
   results.push(daemonNavStats);
   const daemonSnap = await timeOp(() => send({ action: "snapshot", port }));
   const daemonSnapStats = stats("snapshot", "daemon", daemonSnap);
   results.push(daemonSnapStats);
-  const daemonShot = await timeOp(() => send({ action: "screenshot", port, path: "/tmp/bench-shot-d.png" }));
+  const daemonShot = await timeOp(() =>
+    send({ action: "screenshot", port, path: "/tmp/bench-shot-d.png" }),
+  );
   const daemonShotStats = stats("screenshot", "daemon", daemonShot);
   results.push(daemonShotStats);
-  const daemonEval = await timeOp(() => send({ action: "eval", port, expression: "document.title" }));
+  const daemonEval = await timeOp(() =>
+    send({ action: "eval", port, expression: "document.title" }),
+  );
   const daemonEvalStats = stats("eval", "daemon", daemonEval);
   results.push(daemonEvalStats);
   const daemonPages = await timeOp(() => send({ action: "pages", port }));
   const daemonPagesStats = stats("pages", "daemon", daemonPages);
   results.push(daemonPagesStats);
 
-  // --- Raw puppeteer (in-process) benchmarks ---
-
   const session = await connect(port, "");
 
-  const rawNav = await timeOp(() => navigate(session.page, TARGET_URL, 30000, undefined, undefined));
+  const rawNav = await timeOp(() =>
+    navigate(session.page, TARGET_URL, 30000, undefined, undefined),
+  );
   const rawNavStats = stats("navigate", "raw-cdp", rawNav);
   results.push(rawNavStats);
   const rawSnap = await timeOp(() => snapshot(session.page, false, undefined));
   const rawSnapStats = stats("snapshot", "raw-cdp", rawSnap);
   results.push(rawSnapStats);
-  const rawShot = await timeOp(() => screenshot(session.page, "/tmp/bench-shot-raw.png", false, "png", undefined, undefined));
+  const rawShot = await timeOp(() =>
+    screenshot(
+      session.page,
+      "/tmp/bench-shot-raw.png",
+      false,
+      "png",
+      undefined,
+      undefined,
+    ),
+  );
   const rawShotStats = stats("screenshot", "raw-cdp", rawShot);
   results.push(rawShotStats);
-  const rawEval = await timeOp(() => evaluate(session.page, "document.title", undefined));
+  const rawEval = await timeOp(() =>
+    evaluate(session.page, "document.title", undefined),
+  );
   const rawEvalStats = stats("eval", "raw-cdp", rawEval);
   results.push(rawEvalStats);
   const rawPages = await timeOp(async () => {
     const pages = await session.browser.pages();
-    const mapped = pages.map(async (p, i) => ({ id: i, url: p.url(), title: await p.title() }));
+    const mapped = pages.map(async (p, i) => ({
+      id: i,
+      url: p.url(),
+      title: await p.title(),
+    }));
     await Promise.all(mapped);
   });
   const rawPagesStats = stats("pages", "raw-cdp", rawPages);
@@ -171,4 +213,4 @@ const main = async () => {
   await proc.exited;
 };
 
-void main();
+await main();

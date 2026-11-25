@@ -36,12 +36,16 @@ const buildTree = (
   if (!node) return null;
 
   const children = node.childIds
-    ? node.childIds.map((id) => buildTree(nodeMap, id)).filter((n): n is AXTree => n !== null)
+    ? node.childIds
+        .map((id) => buildTree(nodeMap, id))
+        .filter((n): n is AXTree => n !== null)
     : [];
 
   if (node.ignored) {
     const [single] = children;
-    return children.length === 1 && single ? single : { role: "group", name: "", uid: node.nodeId, children };
+    return children.length === 1 && single
+      ? single
+      : { role: "group", name: "", uid: node.nodeId, children };
   }
 
   const role = node.role ? node.role.value : "none";
@@ -63,7 +67,8 @@ const buildTree = (
 const formatTree = (tree: AXTree, depth: number, verbose: boolean): string => {
   const indent = "  ".repeat(depth);
   const value = tree.value ? ` value="${tree.value}"` : "";
-  const desc = verbose && tree.description ? ` description="${tree.description}"` : "";
+  const desc =
+    verbose && tree.description ? ` description="${tree.description}"` : "";
   const line = `${indent}${tree.role} "${tree.name}"${value}${desc} [uid=${tree.uid}]`;
   if (tree.children.length === 0) return line;
   const children = tree.children.map((c) => formatTree(c, depth + 1, verbose));

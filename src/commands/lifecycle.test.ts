@@ -1,11 +1,21 @@
-import { afterEach, expect, test } from "bun:test";
+import { execFile } from "node:child_process";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout } from "node:timers/promises";
+import { promisify } from "node:util";
+import { afterEach, expect, test } from "vitest";
 import { z } from "zod";
 import { isAlive, launch, type Session } from "../browser.ts";
-import { killAllCmd, killCmd, launchCmd, type DaemonState } from "./lifecycle.ts";
+import {
+  killAllCmd,
+  killCmd,
+  launchCmd,
+  type DaemonState,
+} from "./lifecycle.ts";
 import { oneshot } from "./oneshot.ts";
 
 const createState = (): DaemonState => ({
@@ -34,22 +44,34 @@ const inspectSession = async (session: Session) => {
   await client.detach();
   const browserProcess = processInfo.find((info) => info.type === "browser");
   if (!browserProcess) throw new Error("missing browser process");
-  const pids = process.platform === "linux"
-    ? await processTree(browserProcess.id)
-    : processInfo.map((info) => info.id);
+  const pids =
+    process.platform === "linux"
+      ? await processTree(browserProcess.id)
+      : processInfo.map((info) => info.id);
   expect(pids.length).toBeGreaterThan(1);
-  return { port: session.port, userDataDir: session.userDataDir, pid: browserProcess.id, pids };
+  return {
+    port: session.port,
+    userDataDir: session.userDataDir,
+    pid: browserProcess.id,
+    pids,
+  };
 };
 
 type Inspection = Awaited<ReturnType<typeof inspectSession>>;
 
-const processRunning = async (pid: number): Promise<boolean> => {
-  if (process.platform === "linux") {
-    const file = Bun.file(`/proc/${pid}/stat`);
-    if (!await file.exists()) return false;
-    const stat = await file.text();
+const linuxProcessRunning = async (pid: number): Promise<boolean> => {
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
     return !/\) [ZX] /.test(stat);
+  } catch (error) {
+    const missing = z.object({ code: z.enum(["ENOENT", "ESRCH"]) });
+    if (missing.safeParse(error).success) return false;
+    throw error;
   }
+};
+
+const processRunning = async (pid: number): Promise<boolean> => {
+  if (process.platform === "linux") return linuxProcessRunning(pid);
   try {
     process.kill(pid, 0);
     return true;
@@ -60,12 +82,16 @@ const processRunning = async (pid: number): Promise<boolean> => {
   }
 };
 
-const waitForProcesses = async (pids: readonly number[], deadline: number): Promise<void> => {
+const waitForProcesses = async (
+  pids: readonly number[],
+  deadline: number,
+): Promise<void> => {
   const tasks = pids.map(processRunning);
   const running = await Promise.all(tasks);
   if (!running.some(Boolean)) return;
-  if (Date.now() >= deadline) throw new Error(`processes still running: ${pids.join(" ")}`);
-  await Bun.sleep(50);
+  if (Date.now() >= deadline)
+    throw new Error(`processes still running: ${pids.join(" ")}`);
+  await setTimeout(50);
   await waitForProcesses(pids, deadline);
 };
 
@@ -115,7 +141,8 @@ test("kill closes only the requested port when it is not registered", async () =
   const inspection = await inspectSession(session);
   await killCmd(state, session.port);
   unrelated.sessions.delete(session.port);
-  await expectAlive(session.port, false);
+  const running = await isAlive(session.port);
+  expect(running).toBe(false);
   await waitForProcesses(inspection.pids, Date.now() + 10000);
   expectProfile(session.userDataDir, true);
   await rm(session.userDataDir, { recursive: true });
@@ -129,6 +156,7 @@ test("kill-all closes tracked browsers and leaves an unrelated browser alone", a
   const tasks = [first, second].map(inspectSession);
   const inspections = await Promise.all(tasks);
   await killAllCmd(state);
+  expect(state.sessions.size).toBe(0);
   const checks = inspections.map(expectStopped);
   await Promise.all(checks);
   await expectAlive(other.port, true);
@@ -154,61 +182,91 @@ test("shutdown closes tracked browser processes before exiting", async () => {
       consoleCaptures: new Map(),
     });
   `;
-  const child = Bun.spawn([process.execPath, "--eval", script], { stdout: "pipe", stderr: "inherit" });
-  const output = await new Response(child.stdout).text();
-  const code = await child.exited;
-  expect(code).toBe(0);
-  const schema = z.object({ port: z.number(), userDataDir: z.string(), pids: PidsSchema }).readonly();
-  const raw: unknown = await new Response(output).json();
+  const { stdout } = await promisify(execFile)(process.execPath, [
+    "--input-type=module",
+    "--eval",
+    script,
+  ]);
+  const schema = z
+    .object({ port: z.number(), userDataDir: z.string(), pids: PidsSchema })
+    .readonly();
+  const raw: unknown = await new Response(stdout).json();
   const details = schema.parse(raw);
-  await expectAlive(details.port, false);
+  const running = await isAlive(details.port);
+  expect(running).toBe(false);
   expectProfile(details.userDataDir, false);
   await waitForProcesses(details.pids, Date.now() + 10000);
   await expectAlive(other.port, true);
 }, 30000);
 
-const modes: readonly (readonly ["snapshot" | "screenshot" | "failure"])[] = [["snapshot"], ["screenshot"], ["failure"]];
+const modes: readonly (readonly ["snapshot" | "screenshot" | "failure"])[] = [
+  ["snapshot"],
+  ["screenshot"],
+  ["failure"],
+];
 
-test.each(modes)("oneshot %s awaits browser cleanup", async (mode) => {
-  const inspection = Promise.withResolvers<Inspection>();
-  const server = Bun.serve({
-    port: 0,
-    fetch: async () => {
+test.each(modes)(
+  "oneshot %s awaits browser cleanup",
+  async (mode) => {
+    const inspection = Promise.withResolvers<Inspection>();
+    const server = createServer((request, response) => {
+      if (request.url !== "/") {
+        response.writeHead(404).end();
+        return;
+      }
       const [session] = state.sessions.values();
-      if (!session) throw new Error("missing oneshot session");
-      const details = await inspectSession(session);
-      inspection.resolve(details);
-      return new Response("<h1>Lifecycle regression</h1>", { headers: { "content-type": "text/html" } });
-    },
-  });
-  const tmp = tmpdir();
-  const id = crypto.randomUUID();
-  const failurePath = join(tmp, id, "snapshot.txt");
-  try {
-    const result = oneshot(state, {
-      url: server.url.href,
-      mode: mode === "failure" ? "snapshot" : mode,
-      timeout: 5000,
-      path: mode === "failure" ? failurePath : undefined,
-      verbose: false,
-      fullPage: undefined,
-      format: undefined,
-      quality: undefined,
-      width: undefined,
-      height: undefined,
+      if (!session) {
+        response.destroy(new Error("missing oneshot session"));
+        return;
+      }
+      inspectSession(session)
+        .then((details) => {
+          inspection.resolve(details);
+          response.writeHead(200, { "content-type": "text/html" });
+          response.end("<h1>Lifecycle regression</h1>");
+        })
+        .catch((error: unknown) => {
+          response.destroy(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        });
     });
-    if (mode === "failure") {
-      const error: unknown = await result.catch((error: unknown) => error);
-      const { code } = z.object({ code: z.string() }).parse(error);
-      expect(code).toBe("ENOENT");
-    } else {
-      const output = await result;
-      expect(output).toBeString();
+    const listening = once(server, "listening");
+    server.listen(0, "127.0.0.1");
+    await listening;
+    const tmp = tmpdir();
+    const id = crypto.randomUUID();
+    const failurePath = join(tmp, id, "snapshot.txt");
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string")
+        throw new Error("missing HTTP test server address");
+      const result = oneshot(state, {
+        url: `http://127.0.0.1:${address.port}/`,
+        mode: mode === "failure" ? "snapshot" : mode,
+        timeout: 5000,
+        path: mode === "failure" ? failurePath : undefined,
+        verbose: false,
+        fullPage: undefined,
+        format: undefined,
+        quality: undefined,
+        width: undefined,
+        height: undefined,
+      });
+      const outcome = await result.then(
+        (output) => output.length > 0,
+        (error: unknown) => z.object({ code: z.string() }).parse(error).code,
+      );
+      expect(outcome).toBe(mode === "failure" ? "ENOENT" : true);
+      expect(state.sessions.size).toBe(0);
+      const details = await inspection.promise;
+      await expectStopped(details);
+    } finally {
+      const closed = once(server, "close");
+      server.close();
+      server.closeAllConnections();
+      await closed;
     }
-    expect(state.sessions.size).toBe(0);
-    const details = await inspection.promise;
-    await expectStopped(details);
-  } finally {
-    await server.stop(true);
-  }
-}, 30000);
+  },
+  30000,
+);

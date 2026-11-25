@@ -22,18 +22,17 @@ export const handleDialog = async (
   action: "accept" | "dismiss",
   promptText: string | undefined,
 ): Promise<string> => {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     page.once("dialog", (dialog) => {
-      void (async () => {
+      (async () => {
         if (action === "accept") {
           await dialog.accept(promptText);
         } else {
           await dialog.dismiss();
         }
         const dialogType = dialog.type();
-        const result = JSON.stringify({ action, type: dialogType });
-        resolve(result);
-      })();
+        return JSON.stringify({ action, type: dialogType });
+      })().then(resolve, reject);
     });
   });
 };

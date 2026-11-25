@@ -1,5 +1,1 @@
-declare namespace NodeJS {
-  interface ProcessEnv {
-    REVISION?: string;
-  }
-}
+declare const CHROME_CLI_BUILD_REVISION: string;

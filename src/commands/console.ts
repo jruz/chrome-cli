@@ -46,10 +46,7 @@ export const startCapture = (page: Page): ConsoleCapture => {
   return { consoleListener, frameListener, entries, preserved };
 };
 
-export const getEntry = (
-  entries: ConsoleEntry[],
-  msgid: number,
-): string => {
+export const getEntry = (entries: ConsoleEntry[], msgid: number): string => {
   const entry = entries[msgid];
   if (!entry) throw new Error(`console message not found: ${msgid}`);
   return JSON.stringify(entry);
@@ -66,20 +63,27 @@ export const listEntries = (
     ? [...capture.preserved.flat(), ...capture.entries]
     : capture.entries;
 
-  const filtered = typeFilter
-    ? all.filter((e) => e.type === typeFilter)
-    : all;
+  const filtered = typeFilter ? all.filter((e) => e.type === typeFilter) : all;
 
   if (pageSize === undefined) return JSON.stringify(filtered);
-  if (pageIdx === undefined) throw new Error("pageIdx is required when pageSize is set");
+  if (pageIdx === undefined)
+    throw new Error("pageIdx is required when pageSize is set");
 
   const start = pageIdx * pageSize;
   const page = filtered.slice(start, start + pageSize);
-  return JSON.stringify({ entries: page, total: filtered.length, pageIdx, pageSize });
+  return JSON.stringify({
+    entries: page,
+    total: filtered.length,
+    pageIdx,
+    pageSize,
+  });
 };
 
 export const stopCapture = (page: Page, capture: ConsoleCapture): string => {
   page.off("console", capture.consoleListener);
   page.off("framenavigated", capture.frameListener);
-  return JSON.stringify({ stopped: true, totalEntries: capture.entries.length });
+  return JSON.stringify({
+    stopped: true,
+    totalEntries: capture.entries.length,
+  });
 };

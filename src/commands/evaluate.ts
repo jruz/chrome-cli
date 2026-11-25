@@ -4,11 +4,18 @@ import { findByUid } from "./interact";
 type EvalArg = { uid: string };
 
 const isEvalArg = (v: unknown): v is EvalArg =>
-  typeof v === "object" && v !== null &&
-  "uid" in v && typeof v.uid === "string";
+  typeof v === "object" &&
+  v !== null &&
+  "uid" in v &&
+  typeof v.uid === "string";
 
 const buildEvalScript = (expression: string, uids: string[]): string => {
-  const queries = uids.map((uid, i) => `var _a${i}=document.querySelector('[data-chrome-cli-uid="${uid}"]');`).join("");
+  const queries = uids
+    .map(
+      (uid, i) =>
+        `var _a${i}=document.querySelector('[data-chrome-cli-uid="${uid}"]');`,
+    )
+    .join("");
   const argList = uids.map((_, i) => `_a${i}`).join(",");
   return `(()=>{${queries}return(${expression})(${argList});})()`;
 };
@@ -24,7 +31,8 @@ export const evaluate = async (
   }
 
   const validated = args.map((arg, i) => {
-    if (!isEvalArg(arg)) throw new Error(`invalid arg at index ${i}: ${JSON.stringify(arg)}`);
+    if (!isEvalArg(arg))
+      throw new Error(`invalid arg at index ${i}: ${JSON.stringify(arg)}`);
     return arg;
   });
 

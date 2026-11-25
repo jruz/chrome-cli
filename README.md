@@ -5,8 +5,8 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 ## Why this over Chrome MCP?
 
 - **Parallel by design** — each Chrome instance gets its own port, so multiple Claude Code agents can browse simultaneously without conflicts
-- **No context pollution** — state lives in the daemon, not in your LLM context window. MCP tool definitions eat tokens on every request
-- **No MCP setup** — plain CLI invoked via Bash, works anywhere shell commands work
+- **No context pollution** — browser state stays in the daemon, outside the model’s context window
+- **No MCP setup** — run the CLI directly from your shell
 - **Fast** — Unix socket daemon stays warm between calls, no per-request startup cost
 - **Composable** — pipe, script, and chain commands like any CLI tool
 
@@ -80,7 +80,7 @@ cp -r skills/chrome ~/.claude/skills/
 
 ## AI disclaimer
 
-This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by a custom [eslint config](eslint.config.ts) and [slop-detector](https://codeberg.org/jruz/slop-detector).
+This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by the [Oxlint configuration](.oxlintrc.json) and [slop-detector](https://codeberg.org/jruz/slop-detector).
 
 ## License
 

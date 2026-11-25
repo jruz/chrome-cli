@@ -3,7 +3,7 @@ import { writeFile } from "fs/promises";
 
 type Headers = Record<string, string>;
 
-export type NetworkEntry = {
+type NetworkEntry = {
   requestId: string;
   url: string;
   method: string;
@@ -115,15 +115,23 @@ export const listEntries = (
     : capture.entries;
 
   const filtered = typeFilter
-    ? all.filter((e) => e.resourceType?.toLowerCase() === typeFilter.toLowerCase())
+    ? all.filter(
+        (e) => e.resourceType?.toLowerCase() === typeFilter.toLowerCase(),
+      )
     : all;
 
   if (pageSize === undefined) return JSON.stringify(filtered);
-  if (pageIdx === undefined) throw new Error("pageIdx is required when pageSize is set");
+  if (pageIdx === undefined)
+    throw new Error("pageIdx is required when pageSize is set");
 
   const start = pageIdx * pageSize;
   const page = filtered.slice(start, start + pageSize);
-  return JSON.stringify({ entries: page, total: filtered.length, pageIdx, pageSize });
+  return JSON.stringify({
+    entries: page,
+    total: filtered.length,
+    pageIdx,
+    pageSize,
+  });
 };
 
 export const getEntry = async (
@@ -137,8 +145,12 @@ export const getEntry = async (
 
   let responseBody: string | undefined;
   try {
-    const resp = await capture.cdpSession.send("Network.getResponseBody", { requestId: entry.requestId });
-    responseBody = resp.base64Encoded ? Buffer.from(resp.body, "base64").toString() : resp.body;
+    const resp = await capture.cdpSession.send("Network.getResponseBody", {
+      requestId: entry.requestId,
+    });
+    responseBody = resp.base64Encoded
+      ? Buffer.from(resp.body, "base64").toString()
+      : resp.body;
   } catch {
     responseBody = undefined;
   }
@@ -152,13 +164,23 @@ export const getEntry = async (
 
   return JSON.stringify({
     ...entry,
-    responseBody: responseFilePath ? `saved to ${responseFilePath}` : responseBody,
-    requestBody: requestFilePath ? `saved to ${requestFilePath}` : entry.postData,
+    responseBody: responseFilePath
+      ? `saved to ${responseFilePath}`
+      : responseBody,
+    requestBody: requestFilePath
+      ? `saved to ${requestFilePath}`
+      : entry.postData,
   });
 };
 
-export const stopCapture = async (page: Page, capture: NetworkCapture): Promise<string> => {
+export const stopCapture = async (
+  page: Page,
+  capture: NetworkCapture,
+): Promise<string> => {
   page.off("framenavigated", capture.frameListener);
   await capture.cdpSession.detach();
-  return JSON.stringify({ stopped: true, totalEntries: capture.entries.length });
+  return JSON.stringify({
+    stopped: true,
+    totalEntries: capture.entries.length,
+  });
 };

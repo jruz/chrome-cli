@@ -33,7 +33,10 @@ export const oneshot = async (
   const width = opts.width ?? WIDTH;
   const height = opts.height ?? HEIGHT;
   const format = opts.format ?? SCREENSHOT_FORMAT;
-  const fullPage = opts.mode === "screenshot" ? (opts.fullPage ?? SCREENSHOT_FULL_PAGE) : false;
+  const fullPage =
+    opts.mode === "screenshot"
+      ? (opts.fullPage ?? SCREENSHOT_FULL_PAGE)
+      : false;
 
   const session = await launchChrome(true);
   const { port } = session;
@@ -44,7 +47,14 @@ export const oneshot = async (
     await session.page.goto(opts.url, { waitUntil: "networkidle0", timeout });
 
     if (opts.mode === "screenshot") {
-      return await screenshot(session.page, opts.path, fullPage, format, opts.quality, undefined);
+      return await screenshot(
+        session.page,
+        opts.path,
+        fullPage,
+        format,
+        opts.quality,
+        undefined,
+      );
     }
 
     return await snapshot(session.page, opts.verbose, opts.path);

@@ -1,7 +1,12 @@
-import { launch as launchChrome, connect, close, type Session } from "../browser";
-import type { NetworkCapture } from "./network";
-import type { ConsoleCapture } from "./console";
-import { rm } from "fs/promises";
+import {
+  launch as launchChrome,
+  connect,
+  close,
+  type Session,
+} from "../browser.ts";
+import type { NetworkCapture } from "./network.ts";
+import type { ConsoleCapture } from "./console.ts";
+import { rm } from "node:fs/promises";
 
 export type DaemonState = {
   sessions: Map<number, Session>;
@@ -9,7 +14,10 @@ export type DaemonState = {
   consoleCaptures: Map<number, ConsoleCapture>;
 };
 
-export const launchCmd = async (state: DaemonState, headless: boolean): Promise<string> => {
+export const launchCmd = async (
+  state: DaemonState,
+  headless: boolean,
+): Promise<string> => {
   const session = await launchChrome(headless);
   state.sessions.set(session.port, session);
   return JSON.stringify({ port: session.port });
@@ -28,7 +36,10 @@ const cleanupSession = async (
   state.consoleCaptures.delete(port);
 };
 
-const closeSession = async (state: DaemonState, port: number): Promise<Readonly<{ port: number; pid: number }>> => {
+const closeSession = async (
+  state: DaemonState,
+  port: number,
+): Promise<Readonly<{ port: number; pid: number }>> => {
   const session = state.sessions.get(port);
   const browser = session ? session.browser : (await connect(port, "")).browser;
   const pid = await close(browser, port);
@@ -36,7 +47,10 @@ const closeSession = async (state: DaemonState, port: number): Promise<Readonly<
   return { port, pid };
 };
 
-export const killCmd = async (state: DaemonState, port: number): Promise<string> => {
+export const killCmd = async (
+  state: DaemonState,
+  port: number,
+): Promise<string> => {
   const { pid } = await closeSession(state, port);
   return JSON.stringify({ killed: port, pid });
 };

@@ -1,39 +1,38 @@
+mod ts '.just/ts.justfile'
+mod bun '.just/bun.justfile'
+mod tools '.just/tools.just'
+
 setup:
-    just deps-install
+    just ts::install
 
 check:
-    #!/usr/bin/env nu
-    ^just sandbox-check
-    ^just ts-check
-    ^just ts-lint
-    ^just woodpecker-check
+    just ts::check
 
-sandbox-check:
-    sandbox bun scripts/sandbox-check.ts
+fix:
+    just ts::fix
 
-woodpecker-check:
-    woodpecker-cli lint \
-        --strict \
-        .woodpecker/
+test:
+    just ts::test
+    just bun::test
+    just chrome-test
 
 install:
-    #!/usr/bin/env nu
-    ^just chrome-daemon-check
-    ^just chrome-build
-    ^just chrome-install
+    just chrome-daemon-check
+    just chrome-build
+    just chrome-install
 
 chrome-daemon-check:
     #!/usr/bin/env nu
+    use std/log
     let binary = ("~/.local/bin/chrome-cli" | path expand)
     if not ($binary | path exists) { exit 0 }
     let running = (^$binary daemon-status | from json | get running)
     if not $running { exit 0 }
-    print --stderr $"(ansi red)ERROR: daemon is running(ansi reset)"
-    print --stderr "stop it first with: chrome-cli daemon-stop"
+    log error "daemon is running; stop it with chrome-cli daemon-stop"
     exit 1
 
 chrome-run *ARGS:
-    sandbox bun run cli.ts {{ARGS}}
+    sandbox bun run cli.ts {{ ARGS }}
 
 chrome-launch:
     sandbox bun run cli.ts launch
@@ -43,40 +42,46 @@ chrome-launch-headed:
 
 chrome-build:
     #!/usr/bin/env nu
+    use std/log
     if ($env.REVISION? | is-empty) {
-        error make {msg: "ERROR: REVISION is not set"}
+        log error "REVISION is not set"
+        exit 1
     }
     let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
     (^sandbox bun build cli.ts
         --compile
         --outfile dist/chrome-cli
-        --define $"process.env.REVISION='($env.REVISION)'"
+        --define $"CHROME_CLI_BUILD_REVISION='($env.REVISION)'"
         --define $"process.env.BUILD_TIME='($bt)'")
 
 chrome-install:
-    mkdir -p ~/.local/bin
+    mkdir --parents ~/.local/bin
     cp dist/chrome-cli ~/.local/bin/chrome-cli
 
 chrome-bench:
     sandbox bun run bench.ts
 
+chrome-test:
+    sandbox \
+        --network=none \
+        --init \
+        --env CHROME_PATH=/usr/local/bin/chromium-test \
+        -- pnpm exec vitest run src/
+
 ts-check:
-    sandbox bun run tsc --noEmit
+    just ts::tsc-check
 
 ts-lint:
-    sandbox bun run eslint .
-
-fix:
-    just ts-fix
+    just ts::oxlint-check
 
 ts-fix:
-    sandbox bun run eslint --fix .
+    just ts::fix
 
 ts-test:
-    sandbox bun test
+    just test
 
 deps-install:
-    sandbox bun install
+    just ts::install
 
 release-build OS ARCH:
     #!/usr/bin/env nu
@@ -92,7 +97,7 @@ release-build OS ARCH:
         --compile
         --target $target
         --outfile $outfile
-        --define $"process.env.REVISION='($env.REVISION)'"
+        --define $"CHROME_CLI_BUILD_REVISION='($env.REVISION)'"
         --define $"process.env.BUILD_TIME='($bt)'")
 
 release-bump VERSION:

@@ -18,7 +18,16 @@ const structured = (msg: string, severity: string): string => {
 };
 
 export const log = {
-  info: (msg: string) => { const out = structured(msg, "INFO"); console.log(out); },
-  warn: (msg: string) => { const out = structured(msg, "WARN"); console.warn(out); },
-  error: (msg: string) => { const out = structured(msg, "ERROR"); console.error(out); },
+  info: (msg: string) => {
+    const out = structured(msg, "INFO");
+    console.log(out);
+  },
+  warn: (msg: string) => {
+    const out = structured(msg, "WARN");
+    console.warn(out);
+  },
+  error: (msg: string) => {
+    const out = structured(msg, "ERROR");
+    console.error(out);
+  },
 };

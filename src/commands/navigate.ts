@@ -13,11 +13,19 @@ export const navigate = async (
     await page.evaluateOnNewDocument(initScript);
   }
 
+  const dialogFailure = Promise.withResolvers<never>();
   const dialogHandler = handleBeforeUnload
-    ? (dialog: { type: () => string; accept: () => Promise<void>; dismiss: () => Promise<void> }) => {
+    ? (dialog: {
+        type: () => string;
+        accept: () => Promise<void>;
+        dismiss: () => Promise<void>;
+      }) => {
         if (dialog.type() === "beforeunload") {
-          if (handleBeforeUnload === "accept") void dialog.accept();
-          else void dialog.dismiss();
+          const handling =
+            handleBeforeUnload === "accept"
+              ? dialog.accept()
+              : dialog.dismiss();
+          handling.catch(dialogFailure.reject);
         }
       }
     : undefined;
@@ -25,10 +33,10 @@ export const navigate = async (
   if (dialogHandler) page.on("dialog", dialogHandler);
 
   try {
-    const response = await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout,
-    });
+    const response = await Promise.race([
+      page.goto(url, { waitUntil: "domcontentloaded", timeout }),
+      dialogFailure.promise,
+    ]);
     if (!response) {
       throw new Error(`no response from ${url}`);
     }

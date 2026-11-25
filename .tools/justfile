@@ -1,0 +1,14 @@
+mod just 'just.just'
+mod nix 'nix.just'
+mod woodpecker 'woodpecker.just'
+mod renovate 'renovate.just'
+
+check:
+    just --justfile {{ justfile() }} just::check
+    just --justfile {{ justfile() }} nix::check
+    just --justfile {{ justfile() }} woodpecker::check
+    just --justfile {{ justfile() }} renovate::check
+
+fix:
+    just --justfile {{ justfile() }} just::fix
+    just --justfile {{ justfile() }} nix::fix

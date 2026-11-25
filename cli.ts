@@ -1,6 +1,12 @@
 import { Command } from "commander";
 import { log } from "./src/log";
-import { ensureDaemon, isDaemonRunning, send, startDaemon, stopDaemon } from "./src/client";
+import {
+  ensureDaemon,
+  isDaemonRunning,
+  send,
+  startDaemon,
+  stopDaemon,
+} from "./src/client";
 import { versionString } from "./src/version";
 
 type Flag = {
@@ -17,8 +23,16 @@ type CliCommand = {
   toPayload: (opts: Record<string, string>) => Record<string, unknown>;
 };
 
-const req = (flag: string, desc: string): Flag => ({ flag, description: desc, required: true });
-const opt = (flag: string, desc: string): Flag => ({ flag, description: desc, required: false });
+const req = (flag: string, desc: string): Flag => ({
+  flag,
+  description: desc,
+  required: true,
+});
+const opt = (flag: string, desc: string): Flag => ({
+  flag,
+  description: desc,
+  required: false,
+});
 
 const parseViewport = (v: string) => {
   const parts = v.split("x");
@@ -36,7 +50,7 @@ const cliCommands: CliCommand[] = [
     description: "Launch a new Chrome instance",
     needsPort: false,
     flags: [opt("--headed", "launch with visible window")],
-    toPayload: (o) => ({ headless: !o['headed'] }),
+    toPayload: (o) => ({ headless: !o["headed"] }),
   },
   {
     name: "kill",
@@ -69,16 +83,16 @@ const cliCommands: CliCommand[] = [
       opt("--height <px>", "viewport height (default: 768)"),
     ],
     toPayload: (o) => ({
-      url: o['url'],
-      mode: o['mode'],
-      ...(o['timeout'] ? { timeout: Number(o['timeout']) } : {}),
-      path: o['path'],
-      verbose: !!o['verbose'],
-      fullPage: !!o['fullPage'],
-      format: o['format'],
-      ...(o['quality'] ? { quality: Number(o['quality']) } : {}),
-      ...(o['width'] ? { width: Number(o['width']) } : {}),
-      ...(o['height'] ? { height: Number(o['height']) } : {}),
+      url: o["url"],
+      mode: o["mode"],
+      ...(o["timeout"] ? { timeout: Number(o["timeout"]) } : {}),
+      path: o["path"],
+      verbose: !!o["verbose"],
+      fullPage: !!o["fullPage"],
+      format: o["format"],
+      ...(o["quality"] ? { quality: Number(o["quality"]) } : {}),
+      ...(o["width"] ? { width: Number(o["width"]) } : {}),
+      ...(o["height"] ? { height: Number(o["height"]) } : {}),
     }),
   },
   {
@@ -89,9 +103,17 @@ const cliCommands: CliCommand[] = [
       req("--url <url>", "target URL"),
       req("--timeout <ms>", "navigation timeout"),
       opt("--init-script <code>", "JavaScript to inject before load"),
-      opt("--handle-before-unload <action>", "auto-handle beforeunload dialog (accept or decline)"),
+      opt(
+        "--handle-before-unload <action>",
+        "auto-handle beforeunload dialog (accept or decline)",
+      ),
     ],
-    toPayload: (o) => ({ url: o['url'], timeout: Number(o['timeout']), initScript: o['initScript'], handleBeforeUnload: o['handleBeforeUnload'] }),
+    toPayload: (o) => ({
+      url: o["url"],
+      timeout: Number(o["timeout"]),
+      initScript: o["initScript"],
+      handleBeforeUnload: o["handleBeforeUnload"],
+    }),
   },
   {
     name: "back",
@@ -112,14 +134,17 @@ const cliCommands: CliCommand[] = [
     description: "Reload the current page",
     needsPort: true,
     flags: [opt("--ignore-cache", "bypass cache on reload")],
-    toPayload: (o) => ({ ignoreCache: !!o['ignoreCache'] }),
+    toPayload: (o) => ({ ignoreCache: !!o["ignoreCache"] }),
   },
   {
     name: "snapshot",
     description: "Take an accessibility tree snapshot",
     needsPort: true,
-    flags: [opt("--verbose", "include all a11y properties"), opt("--path <path>", "save to file")],
-    toPayload: (o) => ({ verbose: !!o['verbose'], filePath: o['path'] }),
+    flags: [
+      opt("--verbose", "include all a11y properties"),
+      opt("--path <path>", "save to file"),
+    ],
+    toPayload: (o) => ({ verbose: !!o["verbose"], filePath: o["path"] }),
   },
   {
     name: "screenshot",
@@ -133,74 +158,134 @@ const cliCommands: CliCommand[] = [
       opt("--uid <uid>", "capture a single element"),
     ],
     toPayload: (o) => ({
-      path: o['path'],
-      fullPage: !!o['fullPage'],
-      format: o['format'],
-      quality: o['quality'] ? Number(o['quality']) : undefined,
-      uid: o['uid'],
+      path: o["path"],
+      fullPage: !!o["fullPage"],
+      format: o["format"],
+      quality: o["quality"] ? Number(o["quality"]) : undefined,
+      uid: o["uid"],
     }),
   },
   {
     name: "click",
     description: "Click an element by uid",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid from snapshot"), opt("--dbl-click", "double click"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ uid: o['uid'], dblClick: !!o['dblClick'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--uid <uid>", "element uid from snapshot"),
+      opt("--dbl-click", "double click"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      uid: o["uid"],
+      dblClick: !!o["dblClick"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "hover",
     description: "Hover over an element by uid",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid from snapshot"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ uid: o['uid'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--uid <uid>", "element uid from snapshot"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      uid: o["uid"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "fill",
     description: "Clear and type a value into an input",
     needsPort: true,
-    flags: [req("--uid <uid>", "element uid"), req("--value <value>", "text to type"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ uid: o['uid'], value: o['value'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--uid <uid>", "element uid"),
+      req("--value <value>", "text to type"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      uid: o["uid"],
+      value: o["value"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "type",
     description: "Type text into the focused element",
     needsPort: true,
-    flags: [req("--text <text>", "text to type"), opt("--submit-key <key>", "key to press after"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ text: o['text'], submitKey: o['submitKey'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--text <text>", "text to type"),
+      opt("--submit-key <key>", "key to press after"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      text: o["text"],
+      submitKey: o["submitKey"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "press",
     description: "Press a key or combination",
     needsPort: true,
-    flags: [req("--key <key>", "key or combination"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ key: o['key'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--key <key>", "key or combination"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      key: o["key"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "drag",
     description: "Drag an element onto another",
     needsPort: true,
-    flags: [req("--from <uid>", "element to drag"), req("--to <uid>", "drop target"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ from: o['from'], to: o['to'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--from <uid>", "element to drag"),
+      req("--to <uid>", "drop target"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      from: o["from"],
+      to: o["to"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "upload",
     description: "Upload a file through a file input",
     needsPort: true,
-    flags: [req("--uid <uid>", "file input uid"), req("--file <path>", "local file path"), opt("--include-snapshot", "include snapshot in response")],
-    toPayload: (o) => ({ uid: o['uid'], file: o['file'], includeSnapshot: !!o['includeSnapshot'] }),
+    flags: [
+      req("--uid <uid>", "file input uid"),
+      req("--file <path>", "local file path"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
+    toPayload: (o) => ({
+      uid: o["uid"],
+      file: o["file"],
+      includeSnapshot: !!o["includeSnapshot"],
+    }),
   },
   {
     name: "fill-form",
     description: "Fill multiple form elements at once",
     needsPort: true,
-    flags: [req("--fields <json>", "JSON array of {uid, value} objects"), opt("--include-snapshot", "include snapshot in response")],
+    flags: [
+      req("--fields <json>", "JSON array of {uid, value} objects"),
+      opt("--include-snapshot", "include snapshot in response"),
+    ],
     toPayload: (o) => {
-      const raw = o['fields'];
+      const raw = o["fields"];
       if (!raw) throw new Error("--fields is required");
       try {
-        return { fields: JSON.parse(raw), includeSnapshot: !!o['includeSnapshot'] };
+        return {
+          fields: JSON.parse(raw),
+          includeSnapshot: !!o["includeSnapshot"],
+        };
       } catch (err) {
-        throw new Error(`invalid JSON for --fields: ${String(err)}`, { cause: err });
+        throw new Error(`invalid JSON for --fields: ${String(err)}`, {
+          cause: err,
+        });
       }
     },
   },
@@ -208,21 +293,32 @@ const cliCommands: CliCommand[] = [
     name: "resize",
     description: "Resize the page viewport",
     needsPort: true,
-    flags: [req("--width <px>", "viewport width"), req("--height <px>", "viewport height")],
-    toPayload: (o) => ({ width: Number(o['width']), height: Number(o['height']) }),
+    flags: [
+      req("--width <px>", "viewport width"),
+      req("--height <px>", "viewport height"),
+    ],
+    toPayload: (o) => ({
+      width: Number(o["width"]),
+      height: Number(o["height"]),
+    }),
   },
   {
     name: "eval",
     description: "Evaluate JavaScript in page context",
     needsPort: true,
-    flags: [req("--expression <code>", "JavaScript expression"), opt("--args <json>", "JSON array of {uid} element references")],
+    flags: [
+      req("--expression <code>", "JavaScript expression"),
+      opt("--args <json>", "JSON array of {uid} element references"),
+    ],
     toPayload: (o) => {
-      const argsRaw = o['args'];
-      if (!argsRaw) return { expression: o['expression'] };
+      const argsRaw = o["args"];
+      if (!argsRaw) return { expression: o["expression"] };
       try {
-        return { expression: o['expression'], args: JSON.parse(argsRaw) };
+        return { expression: o["expression"], args: JSON.parse(argsRaw) };
       } catch (err) {
-        throw new Error(`invalid JSON for --args: ${String(err)}`, { cause: err });
+        throw new Error(`invalid JSON for --args: ${String(err)}`, {
+          cause: err,
+        });
       }
     },
   },
@@ -240,24 +336,38 @@ const cliCommands: CliCommand[] = [
     flags: [
       req("--url <url>", "URL to load"),
       opt("--background", "open without focusing"),
-      opt("--isolated-context <name>", "create page in isolated browser context"),
+      opt(
+        "--isolated-context <name>",
+        "create page in isolated browser context",
+      ),
       opt("--timeout <ms>", "navigation timeout"),
     ],
-    toPayload: (o) => ({ url: o['url'], background: !!o['background'], isolatedContext: o['isolatedContext'], timeout: o['timeout'] ? Number(o['timeout']) : undefined }),
+    toPayload: (o) => ({
+      url: o["url"],
+      background: !!o["background"],
+      isolatedContext: o["isolatedContext"],
+      timeout: o["timeout"] ? Number(o["timeout"]) : undefined,
+    }),
   },
   {
     name: "close-page",
     description: "Close a page/tab by index",
     needsPort: true,
     flags: [req("--page-id <id>", "page index")],
-    toPayload: (o) => ({ pageId: Number(o['pageId']) }),
+    toPayload: (o) => ({ pageId: Number(o["pageId"]) }),
   },
   {
     name: "select-page",
     description: "Switch focus to a page/tab",
     needsPort: true,
-    flags: [req("--page-id <id>", "page index"), opt("--no-bring-to-front", "select without focusing")],
-    toPayload: (o) => ({ pageId: Number(o['pageId']), noBringToFront: !!o['noBringToFront'] }),
+    flags: [
+      req("--page-id <id>", "page index"),
+      opt("--no-bring-to-front", "select without focusing"),
+    ],
+    toPayload: (o) => ({
+      pageId: Number(o["pageId"]),
+      noBringToFront: !!o["noBringToFront"],
+    }),
   },
   {
     name: "emulate",
@@ -273,35 +383,42 @@ const cliCommands: CliCommand[] = [
       opt("--geolocation <lat,lng>", "geolocation (or 'reset')"),
       opt("--color-scheme <scheme>", "dark, light, or auto"),
       opt("--cpu-throttling <rate>", "CPU slowdown factor (1 to disable)"),
-      opt("--network-conditions <preset>", "Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G, No emulation"),
+      opt(
+        "--network-conditions <preset>",
+        "Offline, Slow 3G, Fast 3G, Slow 4G, Fast 4G, No emulation",
+      ),
     ],
     toPayload: (o) => {
       const resolveViewport = () => {
-        if (!o['viewport']) return undefined;
-        if (o['viewport'] === "reset") return "reset";
-        const vp = parseViewport(o['viewport']);
+        if (!o["viewport"]) return undefined;
+        if (o["viewport"] === "reset") return "reset";
+        const vp = parseViewport(o["viewport"]);
         return {
           ...vp,
-          ...(o['hasTouch'] ? { hasTouch: true } : {}),
-          ...(o['isMobile'] ? { isMobile: true } : {}),
-          ...(o['isLandscape'] ? { isLandscape: true } : {}),
-          ...(o['deviceScaleFactor'] ? { deviceScaleFactor: Number(o['deviceScaleFactor']) } : {}),
+          ...(o["hasTouch"] ? { hasTouch: true } : {}),
+          ...(o["isMobile"] ? { isMobile: true } : {}),
+          ...(o["isLandscape"] ? { isLandscape: true } : {}),
+          ...(o["deviceScaleFactor"]
+            ? { deviceScaleFactor: Number(o["deviceScaleFactor"]) }
+            : {}),
         };
       };
 
       const resolveGeo = () => {
-        if (!o['geolocation']) return undefined;
-        if (o['geolocation'] === "reset") return "reset";
-        return parseGeo(o['geolocation']);
+        if (!o["geolocation"]) return undefined;
+        if (o["geolocation"] === "reset") return "reset";
+        return parseGeo(o["geolocation"]);
       };
 
       return {
         viewport: resolveViewport(),
-        userAgent: o['userAgent'],
+        userAgent: o["userAgent"],
         geolocation: resolveGeo(),
-        colorScheme: o['colorScheme'],
-        cpuThrottlingRate: o['cpuThrottling'] ? Number(o['cpuThrottling']) : undefined,
-        networkConditions: o['networkConditions'],
+        colorScheme: o["colorScheme"],
+        cpuThrottlingRate: o["cpuThrottling"]
+          ? Number(o["cpuThrottling"])
+          : undefined,
+        networkConditions: o["networkConditions"],
       };
     },
   },
@@ -309,19 +426,28 @@ const cliCommands: CliCommand[] = [
     name: "wait",
     description: "Wait for text to appear on the page",
     needsPort: true,
-    flags: [req("--text <texts>", "comma-separated texts"), req("--timeout <ms>", "max wait time")],
+    flags: [
+      req("--text <texts>", "comma-separated texts"),
+      req("--timeout <ms>", "max wait time"),
+    ],
     toPayload: (o) => {
-      const text = o['text'];
+      const text = o["text"];
       if (!text) throw new Error("--text is required");
-      return { texts: text.split(","), timeout: Number(o['timeout']) };
+      return { texts: text.split(","), timeout: Number(o["timeout"]) };
     },
   },
   {
     name: "dialog",
     description: "Handle a browser dialog",
     needsPort: true,
-    flags: [req("--action <action>", "accept or dismiss"), opt("--prompt-text <text>", "prompt input")],
-    toPayload: (o) => ({ dialogAction: o['action'], promptText: o['promptText'] }),
+    flags: [
+      req("--action <action>", "accept or dismiss"),
+      opt("--prompt-text <text>", "prompt input"),
+    ],
+    toPayload: (o) => ({
+      dialogAction: o["action"],
+      promptText: o["promptText"],
+    }),
   },
   {
     name: "trace-start",
@@ -332,21 +458,25 @@ const cliCommands: CliCommand[] = [
       opt("--reload", "reload page after starting trace"),
       opt("--auto-stop", "stop trace after page loads"),
     ],
-    toPayload: (o) => ({ path: o['path'], reload: !!o['reload'], autoStop: !!o['autoStop'] }),
+    toPayload: (o) => ({
+      path: o["path"],
+      reload: !!o["reload"],
+      autoStop: !!o["autoStop"],
+    }),
   },
   {
     name: "trace-stop",
     description: "Stop the performance trace",
     needsPort: true,
     flags: [opt("--path <path>", "save trace to file")],
-    toPayload: (o) => ({ path: o['path'] }),
+    toPayload: (o) => ({ path: o["path"] }),
   },
   {
     name: "trace-analyze",
     description: "Analyze a trace file for performance insights",
     needsPort: false,
     flags: [req("--path <path>", "trace file to analyze")],
-    toPayload: (o) => ({ path: o['path'] }),
+    toPayload: (o) => ({ path: o["path"] }),
   },
   {
     name: "trace-analyze-insight",
@@ -355,16 +485,23 @@ const cliCommands: CliCommand[] = [
     flags: [
       req("--path <path>", "trace file to analyze"),
       req("--insight-set-id <id>", "insight set ID from trace-analyze output"),
-      req("--insight-name <name>", "insight name (DocumentLatency, LCPBreakdown, RenderBlocking, CLSCulprits, LongTasks)"),
+      req(
+        "--insight-name <name>",
+        "insight name (DocumentLatency, LCPBreakdown, RenderBlocking, CLSCulprits, LongTasks)",
+      ),
     ],
-    toPayload: (o) => ({ path: o['path'], insightSetId: o['insightSetId'], insightName: o['insightName'] }),
+    toPayload: (o) => ({
+      path: o["path"],
+      insightSetId: o["insightSetId"],
+      insightName: o["insightName"],
+    }),
   },
   {
     name: "heap-snapshot",
     description: "Capture a heap memory snapshot",
     needsPort: true,
     flags: [req("--path <path>", "save .heapsnapshot to file")],
-    toPayload: (o) => ({ path: o['path'] }),
+    toPayload: (o) => ({ path: o["path"] }),
   },
   {
     name: "network-start",
@@ -384,10 +521,10 @@ const cliCommands: CliCommand[] = [
       opt("--page-idx <n>", "page number (0-based)"),
     ],
     toPayload: (o) => ({
-      type: o['type'],
-      includePreserved: !!o['includePreserved'],
-      pageSize: o['pageSize'] ? Number(o['pageSize']) : undefined,
-      pageIdx: o['pageIdx'] ? Number(o['pageIdx']) : undefined,
+      type: o["type"],
+      includePreserved: !!o["includePreserved"],
+      pageSize: o["pageSize"] ? Number(o["pageSize"]) : undefined,
+      pageIdx: o["pageIdx"] ? Number(o["pageIdx"]) : undefined,
     }),
   },
   {
@@ -400,9 +537,9 @@ const cliCommands: CliCommand[] = [
       opt("--response-file <path>", "save response body to file"),
     ],
     toPayload: (o) => ({
-      reqid: Number(o['reqid']),
-      requestFile: o['requestFile'],
-      responseFile: o['responseFile'],
+      reqid: Number(o["reqid"]),
+      requestFile: o["requestFile"],
+      responseFile: o["responseFile"],
     }),
   },
   {
@@ -430,10 +567,10 @@ const cliCommands: CliCommand[] = [
       opt("--page-idx <n>", "page number (0-based)"),
     ],
     toPayload: (o) => ({
-      type: o['type'],
-      includePreserved: !!o['includePreserved'],
-      pageSize: o['pageSize'] ? Number(o['pageSize']) : undefined,
-      pageIdx: o['pageIdx'] ? Number(o['pageIdx']) : undefined,
+      type: o["type"],
+      includePreserved: !!o["includePreserved"],
+      pageSize: o["pageSize"] ? Number(o["pageSize"]) : undefined,
+      pageIdx: o["pageIdx"] ? Number(o["pageIdx"]) : undefined,
     }),
   },
   {
@@ -441,7 +578,7 @@ const cliCommands: CliCommand[] = [
     description: "Get a single console message by index",
     needsPort: true,
     flags: [req("--msgid <id>", "message index")],
-    toPayload: (o) => ({ msgid: Number(o['msgid']) }),
+    toPayload: (o) => ({ msgid: Number(o["msgid"]) }),
   },
   {
     name: "console-stop",
@@ -452,7 +589,8 @@ const cliCommands: CliCommand[] = [
   },
 ];
 
-const run = (fn: (opts: Record<string, string>) => Promise<string>) =>
+const run =
+  (fn: (opts: Record<string, string>) => Promise<string>) =>
   async (opts: Record<string, string>) => {
     await ensureDaemon();
     try {
@@ -467,7 +605,11 @@ const run = (fn: (opts: Record<string, string>) => Promise<string>) =>
 const parseJson = (raw: string): Record<string, unknown> => {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
       throw new Error("expected object response");
     }
     const entries = Object.entries(parsed);
@@ -482,16 +624,15 @@ const withRunning = (raw: string, running: boolean): string => {
   return JSON.stringify({ running, ...parsed });
 };
 
-const runDaemon = (fn: () => Promise<string>) =>
-  async () => {
-    try {
-      const result = await fn();
-      log.info(result);
-    } catch (err) {
-      log.error(err instanceof Error ? err.message : String(err));
-      process.exit(1);
-    }
-  };
+const runDaemon = (fn: () => Promise<string>) => async () => {
+  try {
+    const result = await fn();
+    log.info(result);
+  } catch (err) {
+    log.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+};
 
 const version = versionString();
 const program = new Command()
@@ -514,7 +655,8 @@ const daemonStartAction = runDaemon(async () => {
   const parsed = parseJson(payload);
   return JSON.stringify({ started: true, ...parsed });
 });
-program.command("daemon-start")
+program
+  .command("daemon-start")
   .description("Start the background daemon")
   .action(daemonStartAction);
 
@@ -527,7 +669,8 @@ const daemonStatusAction = runDaemon(async () => {
   const status = await send({ action: "status" });
   return withRunning(status, true);
 });
-program.command("daemon-status")
+program
+  .command("daemon-status")
   .description("Show daemon status")
   .action(daemonStatusAction);
 
@@ -540,7 +683,8 @@ const daemonStopAction = runDaemon(async () => {
   const result = await stopDaemon();
   return withRunning(result, false);
 });
-program.command("daemon-stop")
+program
+  .command("daemon-stop")
   .description("Stop the background daemon")
   .action(daemonStopAction);
 
@@ -558,8 +702,8 @@ cliCommands.forEach((def) => {
 
   const action = run((opts) => {
     const payload: Record<string, unknown> = { action: def.name };
-    if (def.needsPort && opts['port']) {
-      payload['port'] = Number(opts['port']);
+    if (def.needsPort && opts["port"]) {
+      payload["port"] = Number(opts["port"]);
     }
     const extra = def.toPayload(opts);
     Object.assign(payload, extra);
@@ -572,5 +716,5 @@ if (process.argv.includes("--__daemon")) {
   const { start } = await import("./src/daemon");
   start();
 } else {
-  void program.parseAsync();
+  await program.parseAsync();
 }

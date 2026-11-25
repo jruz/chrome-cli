@@ -3,8 +3,8 @@ repo:
 secrets:
   CODEBERG_TOKEN:
     events:
-    - tag
-    - push
+      - tag
+      - push
     images: null
     value: |
       -----BEGIN AGE ENCRYPTED FILE-----
@@ -20,9 +20,9 @@ settings:
   allow_deploy: false
   allow_pr: true
   cancel_previous_pipeline_events:
-  - push
-  - pull_request
-  config_extension_endpoint: ''
+    - push
+    - pull_request
+  config_extension_endpoint: ""
   require_approval: forks
   timeout: 60
   trusted:

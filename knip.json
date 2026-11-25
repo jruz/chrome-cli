@@ -1,0 +1,15 @@
+{
+  "entry": [
+    "cli.ts!",
+    "src/daemon.ts!",
+    "bench.ts",
+    ".oxlint/**/*.test.ts",
+    "scripts/*.ts!",
+    "scripts/lib/log.ts!",
+    "scripts/lib/output.ts!",
+    "!scripts/**/*.test.ts!",
+    "scripts/**/*.test.ts",
+    "src/**/*.test.{ts,tsx}"
+  ],
+  "project": ["**/*.ts", "!dist/**", "!result/**"]
+}

@@ -3,7 +3,12 @@ import { SOCKET_PATH } from "./config";
 const parseErrorResponse = (text: string): Error => {
   try {
     const parsed: unknown = JSON.parse(text);
-    if (typeof parsed === "object" && parsed !== null && "error" in parsed && typeof parsed.error === "string") {
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "error" in parsed &&
+      typeof parsed.error === "string"
+    ) {
       return new Error(parsed.error);
     }
     return new Error(text);
@@ -13,7 +18,9 @@ const parseErrorResponse = (text: string): Error => {
   }
 };
 
-export const send = async (command: Record<string, unknown>): Promise<string> => {
+export const send = async (
+  command: Record<string, unknown>,
+): Promise<string> => {
   const response = await fetch("http://localhost/command", {
     method: "POST",
     unix: SOCKET_PATH,

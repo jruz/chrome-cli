@@ -30,11 +30,12 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 ## Development
 
-- `bun run cli.ts <command> [options]` — run CLI
-- `bun run tsc --noEmit` — type check
-- `bun run bench.ts` — benchmark CLI vs daemon vs raw CDP
-- `bun test` — run tests
-- `just check` — lint
+- `just chrome-run <command> [options]` — run CLI
+- `just ts::tsc-check` — type check
+- `just setup` — install locked dependencies with pnpm
+- `just test` — run Oxlint rule tests, Bun script tests, and Vitest lifecycle tests
+- `just check` — lint, format-check, and type-check the project
+- `just tools::check` — validate repository configuration
 - `just chrome-bench` — run benchmark
 - `just install` — build and copy to `~/.local/bin/`
 
