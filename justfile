@@ -42,21 +42,17 @@ chrome-launch-headed:
 
 chrome-build:
     #!/usr/bin/env nu
-    use std/log
-    if ($env.REVISION? | is-empty) {
-        log error "REVISION is not set"
-        exit 1
-    }
-    let bt = (date now | format date "%Y-%m-%d %H:%M:%S UTC")
-    (^sandbox bun build cli.ts
-        --compile
-        --outfile dist/chrome-cli
-        --define $"CHROME_CLI_BUILD_REVISION='($env.REVISION)'"
-        --define $"process.env.BUILD_TIME='($bt)'")
+    (^sandbox --mount type=bind,src=/nix/store,dst=/nix/store,readonly
+        --env CHROME_CLI_NATIVE_BUN --env REVISION
+        -- bun scripts/chrome-build.ts)
 
 chrome-install:
-    mkdir --parents ~/.local/bin
-    cp dist/chrome-cli ~/.local/bin/chrome-cli
+    #!/usr/bin/env nu
+    let bin = ("~/.local/bin" | path expand)
+    mkdir $bin
+    let staged = (^mktemp $"($bin)/.chrome-cli.XXXXXX" | str trim)
+    ^install --mode=755 dist/chrome-cli $staged
+    ^mv --no-target-directory $staged ($bin | path join chrome-cli)
 
 chrome-bench:
     sandbox bun run bench.ts

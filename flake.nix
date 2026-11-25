@@ -32,6 +32,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = defaultPackages;
+          CHROME_CLI_NATIVE_BUN = "${pkgs.bun}/bin/bun";
 
           shellHook = ''
             echo ""
