@@ -2,6 +2,7 @@ import { snapshot } from "./snapshot";
 import { screenshot } from "./snapshot";
 import type { DaemonState } from "./lifecycle";
 import { killCmd, launchSession } from "./lifecycle";
+import { track } from "../activity";
 
 type OneshotMode = "snapshot" | "screenshot";
 
@@ -38,24 +39,25 @@ export const oneshot = async (
       : false;
 
   const session = await launchSession(state, true);
-  const { port } = session;
+  const { page, port } = session;
 
-  try {
-    await session.page.setViewport({ height, width });
-    await session.page.goto(opts.url, { timeout, waitUntil: "networkidle0" });
-
-    if (opts.mode === "screenshot") {
-      return await screenshot(
-        session.page,
+  const capture = async (): Promise<string> => {
+    await page.setViewport({ height, width });
+    await page.goto(opts.url, { timeout, waitUntil: "networkidle0" });
+    if (opts.mode === "screenshot")
+      return screenshot(
+        page,
         opts.path,
         fullPage,
         format,
         opts.quality,
         undefined,
       );
-    }
+    return snapshot(page, opts.verbose, opts.path);
+  };
 
-    return await snapshot(session.page, opts.verbose, opts.path);
+  try {
+    return await track(state.activity, port, capture);
   } finally {
     await killCmd(state, port);
   }

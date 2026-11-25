@@ -18,6 +18,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `src/browser.ts` — `launch()` spawns detached Chrome with temp user-data-dir, `connect()` uses puppeteer
 - `src/config.ts` — private per-user runtime directory with socket and lock paths, browser limit
 - `src/capacity.ts` — reserves browser slots before launch and releases them after confirmed exit
+- `src/activity.ts` — tracks last use and in-flight commands so idle owned browsers can be reaped
 - `src/daemon-lock.ts` — `flock` ownership lock so one daemon binds the socket
 - `src/commands/*.ts` — pure functions: take Page/Browser, return JSON string
 - `src/log.ts` — structured JSON logging with `severity` field: `log.info()`, `log.warn()`, `log.error()`

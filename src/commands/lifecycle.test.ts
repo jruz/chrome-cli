@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { readFile, rm } from "node:fs/promises";
@@ -6,29 +6,36 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
-import { promisify } from "node:util";
+import { createInterface } from "node:readline";
 import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
-import { isAlive, launch, type Session } from "../browser.ts";
+import { createActivity, track } from "../activity.ts";
+import { isAlive, type Session } from "../browser.ts";
 import { createCapacity } from "../capacity.ts";
 import {
   killAllCmd,
   killCmd,
   launchCmd,
+  launchSession,
+  reapIdleCmd,
+  sessionFor,
   type DaemonState,
 } from "./lifecycle.ts";
 import { oneshot } from "./oneshot.ts";
 
-const createState = (limit: number): DaemonState => ({
+const createState = (limit: number, idleMs: number): DaemonState => ({
+  activity: createActivity(idleMs),
   capacity: createCapacity(limit),
   consoleCaptures: new Map(),
   networkCaptures: new Map(),
   sessions: new Map(),
 });
 
-const state = createState(8);
-const unrelated = createState(8);
-const capped = createState(2);
+const HOUR = 60 * 60 * 1000;
+const state = createState(8, HOUR);
+const unrelated = createState(8, HOUR);
+const capped = createState(2, HOUR);
+const idle = createState(8, 100);
 const LIMIT_ERROR = /browser limit reached \(2\/2\)/;
 const PidSchema = z.coerce.number().int().positive();
 const PidsSchema = z.array(PidSchema).readonly();
@@ -127,7 +134,52 @@ afterEach(async () => {
   await killAllCmd(state);
   await killAllCmd(unrelated);
   await killAllCmd(capped);
+  await killAllCmd(idle);
 });
+
+test("idle expiry closes the browser and removes its profile", async () => {
+  const session = await start(idle);
+  const inspection = await inspectSession(session);
+  await setTimeout(200);
+  const result = await reapIdleCmd(idle);
+  expect(result).toBe(
+    `{"reaped":[{"pid":${inspection.pid},"port":${session.port}}]}`,
+  );
+  expect(idle.sessions.size).toBe(0);
+  await expectStopped(inspection);
+}, 30000);
+
+test("an in-flight command prevents idle expiry", async () => {
+  const session = await start(idle);
+  const reapWhileBusy = async () => {
+    await setTimeout(200);
+    return reapIdleCmd(idle);
+  };
+  const busy = await track(idle.activity, session.port, reapWhileBusy);
+  const afterUse = await reapIdleCmd(idle);
+  expect([busy, afterUse]).toEqual(['{"reaped":[]}', '{"reaped":[]}']);
+  await expectAlive(session.port, true);
+}, 30000);
+
+const browserPid = (session: Session): number => {
+  const pid = session.browser.process()?.pid;
+  if (pid === undefined) throw new Error("missing browser process");
+  return pid;
+};
+
+test("an unresponsive owned browser is removed and frees capacity", async () => {
+  const session = await start(capped);
+  await launchCmd(capped, true);
+  const inspection = await inspectSession(session);
+  const pid = browserPid(session);
+  process.kill(pid, "SIGKILL");
+  await waitForProcesses([inspection.pid], Date.now() + 10000);
+  const lookup = sessionFor(capped, session.port);
+  await expect(lookup).rejects.toThrow(/is not responding, session removed/);
+  expectProfile(session.userDataDir, false);
+  const replacement = launchCmd(capped, true);
+  await expect(replacement).resolves.toMatch(/"port"/);
+}, 30000);
 
 const oneshotPage = (target: DaemonState) =>
   oneshot(target, {
@@ -218,8 +270,7 @@ test("kill closes only the requested port when it is not registered", async () =
 
 test("kill-all closes tracked browsers and leaves an unrelated browser alone", async () => {
   const first = await start(state);
-  const second = await launch(true);
-  state.sessions.set(second.port, second);
+  const second = await launchSession(state, true);
   const other = await start(unrelated);
   const tasks = [first, second].map(inspectSession);
   const inspections = await Promise.all(tasks);
@@ -230,37 +281,51 @@ test("kill-all closes tracked browsers and leaves an unrelated browser alone", a
   await expectAlive(other.port, true);
 }, 30000);
 
-test("shutdown closes tracked browser processes before exiting", async () => {
+test("SIGTERM closes owned browsers before the daemon exits", async () => {
   const other = await start(unrelated);
   const script = `
-    import { launch } from "./src/browser.ts";
-    import { shutdownCmd } from "./src/commands/lifecycle.ts";
-    const session = await launch(true);
+    import { createActivity } from "./src/activity.ts";
+    import { createCapacity } from "./src/capacity.ts";
+    import { launchSession, shutdownOnSignals } from "./src/commands/lifecycle.ts";
+    const state = {
+      activity: createActivity(60000),
+      capacity: createCapacity(1),
+      sessions: new Map(),
+      networkCaptures: new Map(),
+      consoleCaptures: new Map(),
+    };
+    const session = await launchSession(state, true);
     const client = await session.browser.target().createCDPSession();
     const { processInfo } = await client.send("SystemInfo.getProcessInfo");
     await client.detach();
+    shutdownOnSignals(state);
     console.log(JSON.stringify({
       port: session.port,
       userDataDir: session.userDataDir,
       pids: processInfo.map((info) => info.id),
     }));
-    await shutdownCmd({
-      capacity: { limit: 1, launching: 0, owned: new Set([session.port]) },
-      sessions: new Map([[session.port, session]]),
-      networkCaptures: new Map(),
-      consoleCaptures: new Map(),
-    });
+    setInterval(() => {}, 1000);
   `;
-  const { stdout } = await promisify(execFile)(process.execPath, [
-    "--input-type=module",
-    "--eval",
-    script,
-  ]);
+  const child = spawn(
+    process.execPath,
+    ["--input-type=module", "--eval", script],
+    {
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
+  const exited = once(child, "exit");
+  const lines = createInterface({ input: child.stdout });
+  const firstLine: unknown[] = await once(lines, "line");
+  const [line] = z.tuple([z.string()]).parse(firstLine);
   const schema = z
     .object({ pids: PidsSchema, port: z.number(), userDataDir: z.string() })
     .readonly();
-  const raw: unknown = await new Response(stdout).json();
+  const raw: unknown = await new Response(line).json();
   const details = schema.parse(raw);
+  child.kill("SIGTERM");
+  const exit: unknown[] = await exited;
+  const [code] = z.tuple([z.number(), z.null()]).parse(exit);
+  expect(code).toBe(0);
   const running = await isAlive(details.port);
   expect(running).toBe(false);
   expectProfile(details.userDataDir, false);

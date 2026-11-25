@@ -1,6 +1,7 @@
 import type { Page, Browser } from "puppeteer-core";
 import { log } from "./log";
-import { isAlive, connect, type Session } from "./browser";
+import type { Session } from "./browser";
+import { createActivity, track } from "./activity";
 import type { NetworkCapture } from "./commands/network";
 import type { ConsoleCapture } from "./commands/console";
 import type { TraceCapture } from "./commands/performance";
@@ -49,14 +50,19 @@ import {
   killCmd,
   killAllCmd,
   statusCmd,
+  reapIdleCmd,
+  sessionFor,
   shutdownCmd,
+  shutdownOnSignals,
   type DaemonState,
 } from "./commands/lifecycle";
 import { oneshot } from "./commands/oneshot";
 import {
   ensureRuntimeDir,
   LOCK_PATH,
+  IDLE_TIMEOUT_MS,
   MAX_BROWSERS,
+  REAP_INTERVAL_MS,
   SOCKET_PATH,
 } from "./config";
 import { createCapacity } from "./capacity";
@@ -146,29 +152,14 @@ const networkCaptures = new Map<number, NetworkCapture>();
 const consoleCaptures = new Map<number, ConsoleCapture>();
 const traceCaptures = new Map<number, TraceCapture>();
 const state: DaemonState = {
+  activity: createActivity(IDLE_TIMEOUT_MS),
   capacity: createCapacity(MAX_BROWSERS),
   consoleCaptures,
   networkCaptures,
   sessions,
 };
 
-const getSession = async (port: number): Promise<Session> => {
-  const existing = sessions.get(port);
-  if (existing) {
-    if (await isAlive(port)) return existing;
-    log.warn(`dead session on port ${port}, removing`);
-    await existing.browser.disconnect();
-    sessions.delete(port);
-    networkCaptures.delete(port);
-    consoleCaptures.delete(port);
-    throw new Error(
-      `Chrome on port ${port} is not responding, session removed`,
-    );
-  }
-  const session = await connect(port, "");
-  sessions.set(port, session);
-  return session;
-};
+const getSession = (port: number): Promise<Session> => sessionFor(state, port);
 
 const commands = new Map<string, CommandDef>([
   [
@@ -778,6 +769,21 @@ const dispatch = async (params: Params): Promise<string> => {
   }
 };
 
+const execute = (params: Params): Promise<string> => {
+  const port = params["port"];
+  if (typeof port !== "number" || !state.capacity.owned.has(port))
+    return dispatch(params);
+  return track(state.activity, port, () => dispatch(params));
+};
+
+const reapIdle = (): void => {
+  reapIdleCmd(state)
+    .then(log.info)
+    .catch((error: unknown) => {
+      log.error(`idle reaping failed: ${toErrorMessage(error)}`);
+    });
+};
+
 const removeStaleSocket = (): void => {
   try {
     rmSync(SOCKET_PATH, { force: true });
@@ -801,7 +807,7 @@ const start = () => {
       try {
         const rawBody: unknown = await req.json();
         const body = ParamsSchema.parse(rawBody);
-        const result = await dispatch(body);
+        const result = await execute(body);
         return new Response(result, {
           headers: { "content-type": "application/json" },
         });
@@ -814,6 +820,8 @@ const start = () => {
     },
     unix: SOCKET_PATH,
   });
+  shutdownOnSignals(state);
+  setInterval(reapIdle, REAP_INTERVAL_MS);
 
   log.info(`daemon listening on ${SOCKET_PATH} (pid: ${process.pid})`);
 };

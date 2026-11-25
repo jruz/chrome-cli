@@ -10,6 +10,8 @@ const UID = currentUid();
 const RUNTIME_DIR = `/tmp/chrome-cli-${UID}`;
 
 export const MAX_BROWSERS = 8;
+export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const REAP_INTERVAL_MS = 60 * 1000;
 export const SOCKET_PATH = join(RUNTIME_DIR, "daemon.sock");
 export const LOCK_PATH = join(RUNTIME_DIR, "daemon.lock");
 

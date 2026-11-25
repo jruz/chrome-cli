@@ -1,4 +1,5 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import { once } from "node:events";
 import { accessSync, constants, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -135,6 +136,15 @@ const waitForClosedPort = async (
     throw new Error(`Chrome still responding on port ${port}`);
   await setTimeout(50);
   await waitForClosedPort(port, deadline);
+};
+
+export const terminate = async (browser: Browser): Promise<void> => {
+  const child = browser.process();
+  if (!child) throw new Error("browser process is not owned by this daemon");
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = once(child, "exit");
+  child.kill("SIGKILL");
+  await exited;
 };
 
 export const close = async (

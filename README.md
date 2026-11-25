@@ -88,6 +88,9 @@ Multiple CLI invocations can control different Chrome instances in parallel by u
 The daemon owns at most 8 browsers, counting `launch` and `oneshot` launches in progress.
 A launch over the limit fails until `kill` or `kill-all` closes a browser.
 
+The daemon closes browsers it launched after 30 minutes without a command, unless a command is still running.
+`SIGTERM` and `SIGINT` close tracked browsers before the daemon exits.
+
 ## Claude Code skill
 
 A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code/skills) is included in `skills/chrome/SKILL.md`. Copy it to your skills directory to give Claude Code full knowledge of chrome-cli commands and usage patterns:
