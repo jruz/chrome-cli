@@ -60,13 +60,6 @@ const cliCommands: CliCommand[] = [
     toPayload: () => ({}),
   },
   {
-    description: "Kill all tracked Chrome instances",
-    flags: [],
-    name: "kill-all",
-    needsPort: false,
-    toPayload: () => ({}),
-  },
-  {
     description: "One-shot: launch, navigate, snapshot/screenshot, kill",
     flags: [
       req("--url <url>", "target URL"),
@@ -687,6 +680,27 @@ program
   .command("daemon-stop")
   .description("Stop the background daemon")
   .action(daemonStopAction);
+
+program
+  .command("kill-all")
+  .description("Kill all tracked Chrome instances")
+  .option(
+    "--include-orphans",
+    "also stop all Chrome CLI daemons and orphaned browsers (Linux)",
+  )
+  .action(async (opts: { readonly includeOrphans?: boolean }) => {
+    if (opts.includeOrphans) {
+      return runDaemon(async () => {
+        const { killAllIncludingOrphans } =
+          await import("./src/emergency-cleanup.ts");
+        return killAllIncludingOrphans();
+      })();
+    }
+    return runDaemon(async () => {
+      await ensureDaemon();
+      return send({ action: "kill-all" });
+    })();
+  });
 
 cliCommands.forEach((def) => {
   const cmd = program.command(def.name).description(def.description);

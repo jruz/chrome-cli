@@ -30,6 +30,8 @@ Uses `networkidle0` wait strategy — works with SPAs.
 `kill` waits for the requested browser to close before reporting success.
 `kill-all` and `daemon-stop` close only sessions tracked by that daemon.
 
+On Linux, use `kill-all --include-orphans` for emergency cleanup without the socket. It stops the current user’s Chrome CLI daemons and browsers, including other agents’ sessions.
+
 ## Commands
 
 | Command                 | Purpose                       | Key Flags                                                                                                       |
@@ -37,7 +39,7 @@ Uses `networkidle0` wait strategy — works with SPAs.
 | `oneshot`               | One-shot page capture         | `--url --mode [--timeout] [--path] [--verbose] [--full-page] [--format] [--quality] [--width] [--height]`       |
 | `launch`                | Start Chrome instance         | `--headed`                                                                                                      |
 | `kill`                  | Stop Chrome instance          | `--port`                                                                                                        |
-| `kill-all`              | Stop all instances            |                                                                                                                 |
+| `kill-all`              | Stop tracked instances        | `[--include-orphans]`                                                                                           |
 | `navigate`              | Go to URL                     | `--port --url --timeout [--init-script]`                                                                        |
 | `back`                  | Navigate back                 | `--port`                                                                                                        |
 | `forward`               | Navigate forward              | `--port`                                                                                                        |

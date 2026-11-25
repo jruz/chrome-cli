@@ -60,6 +60,14 @@ chrome-cli close-page --port 9222 --page-id <id>
 chrome-cli kill --port 9222
 ```
 
+### Stop Chrome sessions
+
+- `chrome-cli kill-all` closes sessions tracked by the current daemon.
+- `chrome-cli daemon-stop` also stops the current daemon.
+
+On Linux, pause agents before running `chrome-cli kill-all --include-orphans`.
+The flag stops your Chrome CLI daemons and their browsers even if the socket is dead.
+
 ## How it works
 
 A long-lived daemon runs on a Unix socket (`/tmp/chrome-cli.sock`). The CLI sends JSON commands to the daemon, which manages Chrome sessions via puppeteer-core. The daemon starts automatically on first use.
