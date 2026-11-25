@@ -9,15 +9,19 @@ const structured = (msg: string, severity: string): string => {
     const parsed: unknown = JSON.parse(msg);
     const result = JsonObject.safeParse(parsed);
     if (!result.success) {
-      return JSON.stringify({ severity, message: msg });
+      return JSON.stringify({ message: msg, severity });
     }
     return JSON.stringify({ severity, ...result.data });
   } catch {
-    return JSON.stringify({ severity, message: msg });
+    return JSON.stringify({ message: msg, severity });
   }
 };
 
 export const log = {
+  error: (msg: string) => {
+    const out = structured(msg, "ERROR");
+    console.error(out);
+  },
   info: (msg: string) => {
     const out = structured(msg, "INFO");
     console.log(out);
@@ -25,9 +29,5 @@ export const log = {
   warn: (msg: string) => {
     const out = structured(msg, "WARN");
     console.warn(out);
-  },
-  error: (msg: string) => {
-    const out = structured(msg, "ERROR");
-    console.error(out);
   },
 };

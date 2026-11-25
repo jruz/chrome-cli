@@ -43,8 +43,8 @@ export const oneshot = async (
   state.sessions.set(port, session);
 
   try {
-    await session.page.setViewport({ width, height });
-    await session.page.goto(opts.url, { waitUntil: "networkidle0", timeout });
+    await session.page.setViewport({ height, width });
+    await session.page.goto(opts.url, { timeout, waitUntil: "networkidle0" });
 
     if (opts.mode === "screenshot") {
       return await screenshot(

@@ -18,6 +18,7 @@
     "local/no-comments": "error",
     "local/no-enums": "error",
     "local/no-reduce": "error",
+    "sort-keys": "error",
     "constructor-super": "error",
     "for-direction": "error",
     "getter-return": "error",

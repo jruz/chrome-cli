@@ -138,7 +138,7 @@ const sessions = new Map<number, Session>();
 const networkCaptures = new Map<number, NetworkCapture>();
 const consoleCaptures = new Map<number, ConsoleCapture>();
 const traceCaptures = new Map<number, TraceCapture>();
-const state: DaemonState = { sessions, networkCaptures, consoleCaptures };
+const state: DaemonState = { consoleCaptures, networkCaptures, sessions };
 
 const getSession = async (port: number): Promise<Session> => {
   const existing = sessions.get(port);
@@ -200,16 +200,16 @@ const commands = new Map<string, CommandDef>([
         const width = optNum(p, "width");
         const height = optNum(p, "height");
         return oneshot(state, {
-          url,
-          mode,
-          timeout,
-          path,
-          verbose,
-          fullPage,
           format,
-          quality,
-          width,
+          fullPage,
           height,
+          mode,
+          path,
+          quality,
+          timeout,
+          url,
+          verbose,
+          width,
         });
       },
     },
@@ -393,7 +393,7 @@ const commands = new Map<string, CommandDef>([
         );
         if (!bg) session.page = page;
         const title = await page.title();
-        return JSON.stringify({ url: page.url(), title });
+        return JSON.stringify({ title, url: page.url() });
       },
     },
   ],
@@ -774,7 +774,6 @@ const start = () => {
   }
 
   Bun.serve({
-    unix: SOCKET_PATH,
     fetch: async (req) => {
       try {
         const rawBody: unknown = await req.json();
@@ -790,6 +789,7 @@ const start = () => {
         });
       }
     },
+    unix: SOCKET_PATH,
   });
 
   log.info(`daemon listening on ${SOCKET_PATH} (pid: ${process.pid})`);

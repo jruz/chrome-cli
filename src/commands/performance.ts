@@ -53,9 +53,9 @@ export const startTrace = async (
   const client = await page.createCDPSession();
   await client.send("Tracing.start", {
     traceConfig: {
-      includedCategories: TRACE_CATEGORIES,
-      excludedCategories: ["*"],
       enableSampling: true,
+      excludedCategories: ["*"],
+      includedCategories: TRACE_CATEGORIES,
     },
   });
 
@@ -70,7 +70,7 @@ export const startTrace = async (
 
   return {
     capture: { cdpSession: client },
-    result: JSON.stringify({ tracing: true, filePath }),
+    result: JSON.stringify({ filePath, tracing: true }),
   };
 };
 
@@ -139,9 +139,9 @@ const extractInsights = (events: TraceEvent[]): Record<string, unknown> => {
   );
 
   return {
+    cumulativeLayoutShift: { score: totalShiftScore(shifts) },
     firstContentfulPaint: fcp ? { ms: toMs(fcp.ts) } : null,
     largestContentfulPaint: lcp ? { ms: toMs(lcp.ts) } : null,
-    cumulativeLayoutShift: { score: totalShiftScore(shifts) },
     longTasks: { count: longTasks.length },
   };
 };
@@ -203,10 +203,10 @@ const groupByNavigation = (events: TraceEvent[]): InsightSet[] => {
         : "unknown";
 
     return {
-      id: `nav-${setIdx}`,
-      url,
       events: events.slice(idx, nextNavIdx),
+      id: `nav-${setIdx}`,
       navTs: event.ts,
+      url,
     };
   });
 };
@@ -242,8 +242,8 @@ const extractDocumentLatency = (
 
   return {
     requestStart: { ms: toMs(docSend.ts) },
-    responseReceived: docReceive ? { ms: toMs(docReceive.ts) } : null,
     responseComplete: docFinish ? { ms: toMs(docFinish.ts) } : null,
+    responseReceived: docReceive ? { ms: toMs(docReceive.ts) } : null,
   };
 };
 
@@ -260,9 +260,9 @@ const extractLCPBreakdown = (events: TraceEvent[], navTs: number): unknown => {
   const ttfb = docReceive ? toMs(docReceive.ts) : null;
 
   return {
-    ttfb: ttfb !== null ? { ms: ttfb } : null,
     firstContentfulPaint: fcp ? { ms: toMs(fcp.ts) } : null,
     largestContentfulPaint: { ms: toMs(lcp.ts) },
+    ttfb: ttfb !== null ? { ms: ttfb } : null,
   };
 };
 
@@ -295,11 +295,11 @@ const extractCLSCulprits = (events: TraceEvent[], navTs: number): unknown => {
   const shifts = events.filter((e) => e.name === "LayoutShift");
 
   return {
-    totalScore: totalShiftScore(shifts),
     shifts: shifts.map((e) => ({
-      time: { ms: toMs(e.ts) },
       score: shiftScore(e.args),
+      time: { ms: toMs(e.ts) },
     })),
+    totalScore: totalShiftScore(shifts),
   };
 };
 
@@ -313,8 +313,8 @@ const extractLongTasks = (events: TraceEvent[], navTs: number): unknown => {
   return {
     count: tasks.length,
     tasks: tasks.map((e) => ({
-      start: { ms: toMs(e.ts) },
       duration: { ms: Math.round((e.dur / 1000) * 100) / 100 },
+      start: { ms: toMs(e.ts) },
     })),
   };
 };
@@ -323,11 +323,11 @@ const INSIGHT_EXTRACTORS: Record<
   string,
   (events: TraceEvent[], navTs: number) => unknown
 > = {
+  CLSCulprits: extractCLSCulprits,
   DocumentLatency: extractDocumentLatency,
   LCPBreakdown: extractLCPBreakdown,
-  RenderBlocking: extractRenderBlocking,
-  CLSCulprits: extractCLSCulprits,
   LongTasks: extractLongTasks,
+  RenderBlocking: extractRenderBlocking,
 };
 
 export const analyzeTrace = async (filePath: string): Promise<string> => {
@@ -336,8 +336,8 @@ export const analyzeTrace = async (filePath: string): Promise<string> => {
 
   const insightSets = sets.map((s) => ({
     id: s.id,
-    url: s.url,
     insights: [...AVAILABLE_INSIGHTS],
+    url: s.url,
   }));
 
   const navEvent = events.find((e) => e.name === "navigationStart");
@@ -368,10 +368,10 @@ export const analyzeInsight = async (
     );
 
   return JSON.stringify({
+    data: extractor(set.events, set.navTs),
+    insight: insightName,
     insightSetId: set.id,
     url: set.url,
-    insight: insightName,
-    data: extractor(set.events, set.navTs),
   });
 };
 

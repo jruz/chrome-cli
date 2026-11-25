@@ -31,12 +31,12 @@ export const findByUid = async (
     if (!object.objectId) return null;
 
     await client.send("Runtime.callFunctionOn", {
-      objectId: object.objectId,
+      arguments: [{ value: uid }],
       functionDeclaration: `function(uid) {
         const el = this.nodeType === 3 ? this.parentElement : this;
         if (el && el.setAttribute) el.setAttribute('${ATTR}', uid);
       }`,
-      arguments: [{ value: uid }],
+      objectId: object.objectId,
     });
 
     await client.send("Runtime.releaseObject", { objectId: object.objectId });
@@ -91,7 +91,7 @@ export const typeText = async (
     const key = toKeyInput(submitKey);
     await page.keyboard.press(key);
   }
-  return JSON.stringify({ typed: text, submitKey });
+  return JSON.stringify({ submitKey, typed: text });
 };
 
 export const pressKey = async (page: Page, key: string): Promise<string> => {
@@ -170,5 +170,5 @@ export const uploadFile = async (
   if (!el) throw new Error(`element not found: ${uid}`);
   const input = await el.toElement("input");
   await input.uploadFile(filePath);
-  return JSON.stringify({ uploaded: filePath, to: uid });
+  return JSON.stringify({ to: uid, uploaded: filePath });
 };

@@ -44,7 +44,7 @@ const closeSession = async (
   const browser = session ? session.browser : (await connect(port, "")).browser;
   const pid = await close(browser, port);
   if (session) await cleanupSession(state, port, session);
-  return { port, pid };
+  return { pid, port };
 };
 
 export const killCmd = async (
@@ -66,7 +66,7 @@ export const killAllCmd = async (state: DaemonState): Promise<string> => {
 export const statusCmd = (state: DaemonState): string => {
   const keys = state.sessions.keys();
   const ports = Array.from(keys);
-  return JSON.stringify({ sessions: ports.length, ports });
+  return JSON.stringify({ ports, sessions: ports.length });
 };
 
 export const shutdownCmd = async (state: DaemonState): Promise<string> => {

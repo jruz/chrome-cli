@@ -23,10 +23,10 @@ export const startCapture = (page: Page): ConsoleCapture => {
   const consoleListener = (msg: ConsoleMessage) => {
     const location = msg.location();
     entries.push({
-      type: msg.type(),
-      text: msg.text(),
-      url: location.url,
       lineNumber: location.lineNumber,
+      text: msg.text(),
+      type: msg.type(),
+      url: location.url,
     });
   };
 
@@ -43,7 +43,7 @@ export const startCapture = (page: Page): ConsoleCapture => {
   page.on("console", consoleListener);
   page.on("framenavigated", frameListener);
 
-  return { consoleListener, frameListener, entries, preserved };
+  return { consoleListener, entries, frameListener, preserved };
 };
 
 export const getEntry = (entries: ConsoleEntry[], msgid: number): string => {
@@ -73,9 +73,9 @@ export const listEntries = (
   const page = filtered.slice(start, start + pageSize);
   return JSON.stringify({
     entries: page,
-    total: filtered.length,
     pageIdx,
     pageSize,
+    total: filtered.length,
   });
 };
 

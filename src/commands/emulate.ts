@@ -19,35 +19,35 @@ type NetworkParams = {
 };
 
 const networkPresets: Record<NetworkPreset, NetworkParams> = {
-  Offline: {
-    offline: true,
-    downloadThroughput: 0,
-    uploadThroughput: 0,
-    latency: 0,
-  },
-  "Slow 3G": {
-    offline: false,
-    downloadThroughput: 50000,
-    uploadThroughput: 50000,
-    latency: 2000,
-  },
   "Fast 3G": {
-    offline: false,
     downloadThroughput: 180000,
-    uploadThroughput: 84375,
     latency: 562,
-  },
-  "Slow 4G": {
     offline: false,
-    downloadThroughput: 400000,
-    uploadThroughput: 150000,
-    latency: 300,
+    uploadThroughput: 84375,
   },
   "Fast 4G": {
-    offline: false,
     downloadThroughput: 3000000,
-    uploadThroughput: 1500000,
     latency: 100,
+    offline: false,
+    uploadThroughput: 1500000,
+  },
+  Offline: {
+    downloadThroughput: 0,
+    latency: 0,
+    offline: true,
+    uploadThroughput: 0,
+  },
+  "Slow 3G": {
+    downloadThroughput: 50000,
+    latency: 2000,
+    offline: false,
+    uploadThroughput: 50000,
+  },
+  "Slow 4G": {
+    downloadThroughput: 400000,
+    latency: 300,
+    offline: false,
+    uploadThroughput: 150000,
   },
 };
 
@@ -94,9 +94,9 @@ const applyGeolocation = async (
     await client.send("Emulation.clearGeolocationOverride");
   } else {
     await client.send("Emulation.setGeolocationOverride", {
+      accuracy: 1,
       latitude: geolocation.latitude,
       longitude: geolocation.longitude,
-      accuracy: 1,
     });
   }
   await client.detach();
@@ -121,10 +121,10 @@ const applyNetwork = async (page: Page, conditions: string): Promise<void> => {
 
   if (conditions === "No emulation") {
     await client.send("Network.emulateNetworkConditions", {
-      offline: false,
       downloadThroughput: -1,
-      uploadThroughput: -1,
       latency: 0,
+      offline: false,
+      uploadThroughput: -1,
     });
     await client.detach();
     return;
@@ -190,6 +190,6 @@ export const resizePage = async (
   width: number,
   height: number,
 ): Promise<string> => {
-  await page.setViewport({ width, height });
-  return JSON.stringify({ resized: { width, height } });
+  await page.setViewport({ height, width });
+  return JSON.stringify({ resized: { height, width } });
 };

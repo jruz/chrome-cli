@@ -34,16 +34,16 @@ export const navigate = async (
 
   try {
     const response = await Promise.race([
-      page.goto(url, { waitUntil: "domcontentloaded", timeout }),
+      page.goto(url, { timeout, waitUntil: "domcontentloaded" }),
       dialogFailure.promise,
     ]);
     if (!response) {
       throw new Error(`no response from ${url}`);
     }
     return JSON.stringify({
-      url: page.url(),
       status: response.status(),
       title: await page.title(),
+      url: page.url(),
     });
   } finally {
     if (dialogHandler) page.off("dialog", dialogHandler);
@@ -52,12 +52,12 @@ export const navigate = async (
 
 export const navigateBack = async (page: Page): Promise<string> => {
   await page.goBack({ waitUntil: "domcontentloaded" });
-  return JSON.stringify({ url: page.url(), title: await page.title() });
+  return JSON.stringify({ title: await page.title(), url: page.url() });
 };
 
 export const navigateForward = async (page: Page): Promise<string> => {
   await page.goForward({ waitUntil: "domcontentloaded" });
-  return JSON.stringify({ url: page.url(), title: await page.title() });
+  return JSON.stringify({ title: await page.title(), url: page.url() });
 };
 
 export const reload = async (
@@ -72,5 +72,5 @@ export const reload = async (
   } else {
     await page.reload({ waitUntil: "domcontentloaded" });
   }
-  return JSON.stringify({ url: page.url(), title: await page.title() });
+  return JSON.stringify({ title: await page.title(), url: page.url() });
 };

@@ -22,10 +22,10 @@ export const send = async (
   command: Record<string, unknown>,
 ): Promise<string> => {
   const response = await fetch("http://localhost/command", {
+    body: JSON.stringify(command),
+    headers: { "content-type": "application/json" },
     method: "POST",
     unix: SOCKET_PATH,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(command),
   });
 
   const text = await response.text();

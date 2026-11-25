@@ -63,12 +63,12 @@ const launchBrowser = async (
   try {
     return await puppeteer.launch({
       executablePath: chromeExecutable(),
-      userDataDir,
-      headless,
-      timeout: 10000,
+      handleSIGHUP: false,
       handleSIGINT: false,
       handleSIGTERM: false,
-      handleSIGHUP: false,
+      headless,
+      timeout: 10000,
+      userDataDir,
     });
   } catch (error) {
     rmSync(userDataDir, { recursive: true });

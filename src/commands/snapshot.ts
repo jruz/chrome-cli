@@ -4,13 +4,13 @@ import { z } from "zod";
 import { findByUid } from "./interact";
 
 const RawAXNodeSchema = z.object({
-  nodeId: z.string(),
-  role: z.object({ value: z.string() }).optional(),
-  name: z.object({ value: z.string() }).optional(),
   childIds: z.string().array().optional(),
-  value: z.object({ value: z.union([z.string(), z.number()]) }).optional(),
   description: z.object({ value: z.string() }).optional(),
   ignored: z.boolean().optional(),
+  name: z.object({ value: z.string() }).optional(),
+  nodeId: z.string(),
+  role: z.object({ value: z.string() }).optional(),
+  value: z.object({ value: z.union([z.string(), z.number()]) }).optional(),
 });
 
 type RawAXNode = z.infer<typeof RawAXNodeSchema>;
@@ -45,7 +45,7 @@ const buildTree = (
     const [single] = children;
     return children.length === 1 && single
       ? single
-      : { role: "group", name: "", uid: node.nodeId, children };
+      : { children, name: "", role: "group", uid: node.nodeId };
   }
 
   const role = node.role ? node.role.value : "none";
@@ -55,12 +55,12 @@ const buildTree = (
   const val = rawVal !== undefined ? String(rawVal) : undefined;
   const desc = node.description?.value;
   return {
-    role,
+    children,
+    ...(desc !== undefined ? { description: desc } : {}),
     name,
+    role,
     uid: node.nodeId,
     ...(val !== undefined ? { value: val } : {}),
-    ...(desc !== undefined ? { description: desc } : {}),
-    children,
   };
 };
 

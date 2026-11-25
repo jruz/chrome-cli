@@ -53,15 +53,15 @@ export const startCapture = async (page: Page): Promise<NetworkCapture> => {
 
   cdpSession.on("Network.requestWillBeSent", (params: RequestWillBeSent) => {
     const entry: NetworkEntry = {
-      requestId: params.requestId,
-      url: params.request.url,
-      method: params.request.method,
-      resourceType: params.type,
-      status: null,
       encodedDataLength: null,
-      requestHeaders: params.request.headers,
-      responseHeaders: {},
+      method: params.request.method,
       postData: params.request.postData,
+      requestHeaders: params.request.headers,
+      requestId: params.requestId,
+      resourceType: params.type,
+      responseHeaders: {},
+      status: null,
+      url: params.request.url,
     };
     pending.set(params.requestId, entry);
     entries.push(entry);
@@ -100,7 +100,7 @@ export const startCapture = async (page: Page): Promise<NetworkCapture> => {
   page.on("framenavigated", frameListener);
   await cdpSession.send("Network.enable");
 
-  return { cdpSession, entries, preserved, frameListener };
+  return { cdpSession, entries, frameListener, preserved };
 };
 
 export const listEntries = (
@@ -128,9 +128,9 @@ export const listEntries = (
   const page = filtered.slice(start, start + pageSize);
   return JSON.stringify({
     entries: page,
-    total: filtered.length,
     pageIdx,
     pageSize,
+    total: filtered.length,
   });
 };
 
@@ -164,12 +164,12 @@ export const getEntry = async (
 
   return JSON.stringify({
     ...entry,
-    responseBody: responseFilePath
-      ? `saved to ${responseFilePath}`
-      : responseBody,
     requestBody: requestFilePath
       ? `saved to ${requestFilePath}`
       : entry.postData,
+    responseBody: responseFilePath
+      ? `saved to ${responseFilePath}`
+      : responseBody,
   });
 };
 

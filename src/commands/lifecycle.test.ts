@@ -19,9 +19,9 @@ import {
 import { oneshot } from "./oneshot.ts";
 
 const createState = (): DaemonState => ({
-  sessions: new Map(),
-  networkCaptures: new Map(),
   consoleCaptures: new Map(),
+  networkCaptures: new Map(),
+  sessions: new Map(),
 });
 
 const state = createState();
@@ -50,10 +50,10 @@ const inspectSession = async (session: Session) => {
       : processInfo.map((info) => info.id);
   expect(pids.length).toBeGreaterThan(1);
   return {
-    port: session.port,
-    userDataDir: session.userDataDir,
     pid: browserProcess.id,
     pids,
+    port: session.port,
+    userDataDir: session.userDataDir,
   };
 };
 
@@ -188,7 +188,7 @@ test("shutdown closes tracked browser processes before exiting", async () => {
     script,
   ]);
   const schema = z
-    .object({ port: z.number(), userDataDir: z.string(), pids: PidsSchema })
+    .object({ pids: PidsSchema, port: z.number(), userDataDir: z.string() })
     .readonly();
   const raw: unknown = await new Response(stdout).json();
   const details = schema.parse(raw);
@@ -242,16 +242,16 @@ test.each(modes)(
       if (address === null || typeof address === "string")
         throw new Error("missing HTTP test server address");
       const result = oneshot(state, {
-        url: `http://127.0.0.1:${address.port}/`,
-        mode: mode === "failure" ? "snapshot" : mode,
-        timeout: 5000,
-        path: mode === "failure" ? failurePath : undefined,
-        verbose: false,
-        fullPage: undefined,
         format: undefined,
-        quality: undefined,
-        width: undefined,
+        fullPage: undefined,
         height: undefined,
+        mode: mode === "failure" ? "snapshot" : mode,
+        path: mode === "failure" ? failurePath : undefined,
+        quality: undefined,
+        timeout: 5000,
+        url: `http://127.0.0.1:${address.port}/`,
+        verbose: false,
+        width: undefined,
       });
       const outcome = await result.then(
         (output) => output.length > 0,

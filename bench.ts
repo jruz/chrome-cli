@@ -46,12 +46,12 @@ const stats = (
   const minVal = Math.min(...times);
   const maxVal = Math.max(...times);
   return {
-    operation,
-    method,
-    times: times.map((t) => Math.round(t)),
     avg: Math.round(sumTimes(times, 0, 0) / times.length),
-    min: Math.round(minVal),
     max: Math.round(maxVal),
+    method,
+    min: Math.round(minVal),
+    operation,
+    times: times.map((t) => Math.round(t)),
   };
 };
 
@@ -60,8 +60,8 @@ const runCli = async (args: string): Promise<number[]> => {
   for (let i = 0; i < RUNS; i++) {
     const start = performance.now();
     const proc = Bun.spawn(["bun", "run", "cli.ts", ...args.split(" ")], {
-      stdout: "pipe",
       stderr: "pipe",
+      stdout: "pipe",
     });
     await proc.exited;
     times.push(performance.now() - start);
@@ -90,7 +90,7 @@ const main = async () => {
   }
   const port = parsed.port;
 
-  await send({ action: "navigate", port, url: TARGET_URL, timeout: 30000 });
+  await send({ action: "navigate", port, timeout: 30000, url: TARGET_URL });
 
   const results: BenchResult[] = [];
 
@@ -117,7 +117,7 @@ const main = async () => {
   results.push(cliPagesStats);
 
   const daemonNav = await timeOp(() =>
-    send({ action: "navigate", port, url: TARGET_URL, timeout: 30000 }),
+    send({ action: "navigate", port, timeout: 30000, url: TARGET_URL }),
   );
   const daemonNavStats = stats("navigate", "daemon", daemonNav);
   results.push(daemonNavStats);
@@ -125,12 +125,12 @@ const main = async () => {
   const daemonSnapStats = stats("snapshot", "daemon", daemonSnap);
   results.push(daemonSnapStats);
   const daemonShot = await timeOp(() =>
-    send({ action: "screenshot", port, path: "/tmp/bench-shot-d.png" }),
+    send({ action: "screenshot", path: "/tmp/bench-shot-d.png", port }),
   );
   const daemonShotStats = stats("screenshot", "daemon", daemonShot);
   results.push(daemonShotStats);
   const daemonEval = await timeOp(() =>
-    send({ action: "eval", port, expression: "document.title" }),
+    send({ action: "eval", expression: "document.title", port }),
   );
   const daemonEvalStats = stats("eval", "daemon", daemonEval);
   results.push(daemonEvalStats);
@@ -169,8 +169,8 @@ const main = async () => {
     const pages = await session.browser.pages();
     const mapped = pages.map(async (p, i) => ({
       id: i,
-      url: p.url(),
       title: await p.title(),
+      url: p.url(),
     }));
     await Promise.all(mapped);
   });

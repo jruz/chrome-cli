@@ -4,8 +4,8 @@ export const listPages = async (browser: Browser): Promise<string> => {
   const pages = await browser.pages();
   const mapped = pages.map(async (p, i) => ({
     id: i,
-    url: p.url(),
     title: await p.title(),
+    url: p.url(),
   }));
   const info = await Promise.all(mapped);
   return JSON.stringify(info);
