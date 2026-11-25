@@ -1,8 +1,7 @@
-import { launch as launchChrome } from "../browser";
 import { snapshot } from "./snapshot";
 import { screenshot } from "./snapshot";
 import type { DaemonState } from "./lifecycle";
-import { killCmd } from "./lifecycle";
+import { killCmd, launchSession } from "./lifecycle";
 
 type OneshotMode = "snapshot" | "screenshot";
 
@@ -38,9 +37,8 @@ export const oneshot = async (
       ? (opts.fullPage ?? SCREENSHOT_FULL_PAGE)
       : false;
 
-  const session = await launchChrome(true);
+  const session = await launchSession(state, true);
   const { port } = session;
-  state.sessions.set(port, session);
 
   try {
     await session.page.setViewport({ height, width });

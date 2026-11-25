@@ -85,6 +85,9 @@ CLI → Unix socket → Daemon → CDP → Chrome
 
 Multiple CLI invocations can control different Chrome instances in parallel by using different `--port` values.
 
+The daemon owns at most 8 browsers, counting `launch` and `oneshot` launches in progress.
+A launch over the limit fails until `kill` or `kill-all` closes a browser.
+
 ## Claude Code skill
 
 A [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code/skills) is included in `skills/chrome/SKILL.md`. Copy it to your skills directory to give Claude Code full knowledge of chrome-cli commands and usage patterns:

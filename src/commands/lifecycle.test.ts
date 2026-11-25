@@ -7,9 +7,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { promisify } from "node:util";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { z } from "zod";
 import { isAlive, launch, type Session } from "../browser.ts";
+import { createCapacity } from "../capacity.ts";
 import {
   killAllCmd,
   killCmd,
@@ -18,14 +19,17 @@ import {
 } from "./lifecycle.ts";
 import { oneshot } from "./oneshot.ts";
 
-const createState = (): DaemonState => ({
+const createState = (limit: number): DaemonState => ({
+  capacity: createCapacity(limit),
   consoleCaptures: new Map(),
   networkCaptures: new Map(),
   sessions: new Map(),
 });
 
-const state = createState();
-const unrelated = createState();
+const state = createState(8);
+const unrelated = createState(8);
+const capped = createState(2);
+const LIMIT_ERROR = /browser limit reached \(2\/2\)/;
 const PidSchema = z.coerce.number().int().positive();
 const PidsSchema = z.array(PidSchema).readonly();
 
@@ -119,9 +123,73 @@ const start = async (target: DaemonState): Promise<Session> => {
 };
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await killAllCmd(state);
   await killAllCmd(unrelated);
+  await killAllCmd(capped);
 });
+
+const oneshotPage = (target: DaemonState) =>
+  oneshot(target, {
+    format: undefined,
+    fullPage: undefined,
+    height: undefined,
+    mode: "snapshot",
+    path: undefined,
+    quality: undefined,
+    timeout: 5000,
+    url: "data:text/html,<h1>capacity</h1>",
+    verbose: false,
+    width: undefined,
+  });
+
+const rejectionMessage = (result: PromiseSettledResult<string>) => {
+  if (result.status === "fulfilled") return "fulfilled";
+  return z.instanceof(Error).parse(result.reason).message;
+};
+
+test("parallel launch and oneshot cannot exceed the browser limit", async () => {
+  const attempts = [
+    launchCmd(capped, true),
+    oneshotPage(capped),
+    launchCmd(capped, true),
+    oneshotPage(capped),
+  ];
+  const results = await Promise.allSettled(attempts);
+  const outcomes = results.map(rejectionMessage);
+  const [admitted, rejected] = [outcomes.slice(0, 2), outcomes.slice(2)];
+  expect(admitted).toEqual(["fulfilled", "fulfilled"]);
+  rejected.forEach((message) => {
+    expect(message).toMatch(LIMIT_ERROR);
+  });
+  expect(capped.sessions.size).toBe(1);
+
+  await launchCmd(capped, true);
+  const full = launchCmd(capped, true);
+  await expect(full).rejects.toThrow(LIMIT_ERROR);
+}, 30000);
+
+test("killing a browser frees its capacity", async () => {
+  const first = await start(capped);
+  await launchCmd(capped, true);
+  await killCmd(capped, first.port);
+  const replacement = launchCmd(capped, true);
+  await expect(replacement).resolves.toMatch(/"port"/);
+}, 30000);
+
+test("failed launches free capacity", async () => {
+  vi.stubEnv("CHROME_PATH", "/missing/chrome");
+  vi.stubEnv("PATH", "");
+  const failures = [1, 2, 3].map(() => launchCmd(capped, true));
+  const results = await Promise.allSettled(failures);
+  const outcomes = results.map(rejectionMessage);
+  expect(outcomes[0]).toMatch(/chrome\/chromium not found/);
+  vi.unstubAllEnvs();
+
+  const launches = [launchCmd(capped, true), launchCmd(capped, true)];
+  const sessions = await Promise.all(launches);
+  expect(sessions).toHaveLength(2);
+}, 30000);
 
 test("kill awaits Chrome exit without killing the CDP client or an unrelated browser", async () => {
   const session = await start(state);
@@ -177,6 +245,7 @@ test("shutdown closes tracked browser processes before exiting", async () => {
       pids: processInfo.map((info) => info.id),
     }));
     await shutdownCmd({
+      capacity: { limit: 1, launching: 0, owned: new Set([session.port]) },
       sessions: new Map([[session.port, session]]),
       networkCaptures: new Map(),
       consoleCaptures: new Map(),

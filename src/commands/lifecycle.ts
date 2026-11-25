@@ -4,22 +4,49 @@ import {
   close,
   type Session,
 } from "../browser.ts";
+import {
+  cancel,
+  confirm,
+  release,
+  reserve,
+  type Capacity,
+} from "../capacity.ts";
 import type { NetworkCapture } from "./network.ts";
 import type { ConsoleCapture } from "./console.ts";
 import { rm } from "node:fs/promises";
 
 export type DaemonState = {
+  capacity: Capacity;
   sessions: Map<number, Session>;
   networkCaptures: Map<number, NetworkCapture>;
   consoleCaptures: Map<number, ConsoleCapture>;
+};
+
+const startBrowser = async (headless: boolean, capacity: Capacity) => {
+  try {
+    return await launchChrome(headless);
+  } catch (error) {
+    cancel(capacity);
+    throw error;
+  }
+};
+
+export const launchSession = async (
+  state: DaemonState,
+  headless: boolean,
+): Promise<Session> => {
+  reserve(state.capacity);
+  const session = await startBrowser(headless, state.capacity);
+  confirm(state.capacity, session.port);
+  state.sessions.set(session.port, session);
+  return session;
 };
 
 export const launchCmd = async (
   state: DaemonState,
   headless: boolean,
 ): Promise<string> => {
-  const session = await launchChrome(headless);
-  state.sessions.set(session.port, session);
+  const session = await launchSession(state, headless);
   return JSON.stringify({ port: session.port });
 };
 
@@ -31,6 +58,7 @@ const cleanupSession = async (
   if (session.userDataDir) {
     await rm(session.userDataDir, { recursive: true });
   }
+  release(state.capacity, port);
   state.sessions.delete(port);
   state.networkCaptures.delete(port);
   state.consoleCaptures.delete(port);

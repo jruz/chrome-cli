@@ -53,7 +53,13 @@ import {
   type DaemonState,
 } from "./commands/lifecycle";
 import { oneshot } from "./commands/oneshot";
-import { ensureRuntimeDir, LOCK_PATH, SOCKET_PATH } from "./config";
+import {
+  ensureRuntimeDir,
+  LOCK_PATH,
+  MAX_BROWSERS,
+  SOCKET_PATH,
+} from "./config";
+import { createCapacity } from "./capacity";
 import { acquireDaemonLock } from "./daemon-lock";
 import { rmSync } from "node:fs";
 import { z, ZodError } from "zod";
@@ -139,7 +145,12 @@ const sessions = new Map<number, Session>();
 const networkCaptures = new Map<number, NetworkCapture>();
 const consoleCaptures = new Map<number, ConsoleCapture>();
 const traceCaptures = new Map<number, TraceCapture>();
-const state: DaemonState = { consoleCaptures, networkCaptures, sessions };
+const state: DaemonState = {
+  capacity: createCapacity(MAX_BROWSERS),
+  consoleCaptures,
+  networkCaptures,
+  sessions,
+};
 
 const getSession = async (port: number): Promise<Session> => {
   const existing = sessions.get(port);
