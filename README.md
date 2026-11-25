@@ -70,7 +70,14 @@ The flag stops your Chrome CLI daemons and their browsers even if the socket is 
 
 ## How it works
 
-A long-lived daemon runs on a Unix socket (`/tmp/chrome-cli.sock`). The CLI sends JSON commands to the daemon, which manages Chrome sessions via puppeteer-core. The daemon starts automatically on first use.
+A long-lived daemon runs on a Unix socket (`/tmp/chrome-cli-<uid>/daemon.sock`). The CLI sends JSON commands to the daemon, which manages Chrome sessions via puppeteer-core. The daemon starts automatically on first use.
+
+The daemon holds an exclusive lock on `daemon.lock` in the same private directory. Concurrent cold starts share the daemon that wins the lock.
+
+### Upgrading from `/tmp/chrome-cli.sock`
+
+Run `chrome-cli daemon-stop` with the old binary before installing.
+A daemon left on the old socket can be stopped with `chrome-cli kill-all --include-orphans` on Linux.
 
 ```
 CLI → Unix socket → Daemon → CDP → Chrome

@@ -14,9 +14,10 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 - `cli.ts` — thin CLI client, parses flags with commander, sends JSON to daemon, prints response
 - `src/client.ts` — `send()` POSTs JSON to Unix socket, `ensureDaemon()` auto-starts daemon on first call
-- `src/daemon.ts` — long-lived Bun HTTP server on `/tmp/chrome-cli.sock`, holds sessions map, routes commands
+- `src/daemon.ts` — long-lived Bun HTTP server on `/tmp/chrome-cli-<uid>/daemon.sock`, holds sessions map, routes commands
 - `src/browser.ts` — `launch()` spawns detached Chrome with temp user-data-dir, `connect()` uses puppeteer
-- `src/config.ts` — exports `SOCKET_PATH` constant for Unix socket location
+- `src/config.ts` — private per-user runtime directory with socket and lock paths
+- `src/daemon-lock.ts` — `flock` ownership lock so one daemon binds the socket
 - `src/commands/*.ts` — pure functions: take Page/Browser, return JSON string
 - `src/log.ts` — structured JSON logging with `severity` field: `log.info()`, `log.warn()`, `log.error()`
 
@@ -33,7 +34,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `just chrome-run <command> [options]` — run CLI
 - `just ts::tsc-check` — type check
 - `just setup` — install locked dependencies with pnpm
-- `just test` — run Oxlint rule tests, Bun script tests, and Vitest lifecycle tests
+- `just test` — run Oxlint rule tests, Bun script and daemon startup tests, and Vitest lifecycle tests
 - `just check` — lint, format-check, and type-check the project
 - `just tools::check` — validate repository configuration
 - `just chrome-bench` — run benchmark

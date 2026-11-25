@@ -53,8 +53,9 @@ import {
   type DaemonState,
 } from "./commands/lifecycle";
 import { oneshot } from "./commands/oneshot";
-import { SOCKET_PATH } from "./config";
-import { unlinkSync } from "fs";
+import { ensureRuntimeDir, LOCK_PATH, SOCKET_PATH } from "./config";
+import { acquireDaemonLock } from "./daemon-lock";
+import { rmSync } from "node:fs";
 import { z, ZodError } from "zod";
 
 const keySchema = z.string();
@@ -766,12 +767,23 @@ const dispatch = async (params: Params): Promise<string> => {
   }
 };
 
-const start = () => {
+const removeStaleSocket = (): void => {
   try {
-    unlinkSync(SOCKET_PATH);
-  } catch (err) {
-    log.warn(`failed to unlink socket: ${String(err)}`);
+    rmSync(SOCKET_PATH, { force: true });
+  } catch (error) {
+    throw new Error(`Could not remove ${SOCKET_PATH}: ${String(error)}`, {
+      cause: error,
+    });
   }
+};
+
+const start = () => {
+  ensureRuntimeDir();
+  if (!acquireDaemonLock(LOCK_PATH)) {
+    log.info(`another daemon owns ${LOCK_PATH} (pid: ${process.pid} exiting)`);
+    return;
+  }
+  removeStaleSocket();
 
   Bun.serve({
     fetch: async (req) => {

@@ -1,4 +1,15 @@
-import { SOCKET_PATH } from "./config";
+import { z } from "zod";
+import { ensureRuntimeDir, SOCKET_PATH } from "./config";
+
+const Unreachable = z.object({
+  code: z.enum([
+    "ENOENT",
+    "ECONNREFUSED",
+    "FailedToOpenSocket",
+    "ConnectionClosed",
+    "ECONNRESET",
+  ]),
+});
 
 const parseErrorResponse = (text: string): Error => {
   try {
@@ -21,6 +32,7 @@ const parseErrorResponse = (text: string): Error => {
 export const send = async (
   command: Record<string, unknown>,
 ): Promise<string> => {
+  ensureRuntimeDir();
   const response = await fetch("http://localhost/command", {
     body: JSON.stringify(command),
     headers: { "content-type": "application/json" },
@@ -41,7 +53,8 @@ export const isDaemonRunning = async (): Promise<boolean> => {
   try {
     await send({ action: "status" });
     return true;
-  } catch {
+  } catch (error) {
+    if (!Unreachable.safeParse(error).success) throw error;
     return false;
   }
 };
