@@ -2,7 +2,10 @@ module github.com/jruz/chrome-cli
 
 go 1.27.4
 
-require github.com/alecthomas/kong v1.17.0
+require (
+	github.com/alecthomas/kong v1.17.0
+	github.com/coder/websocket v1.8.15
+)
 
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect

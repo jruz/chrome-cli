@@ -8,7 +8,11 @@ check:
     just go::staticcheck-check
 
 test:
-    sandbox go test {{ packages }}
+    sandbox \
+        --network=none \
+        --init \
+        --env CHROME_PATH=/usr/local/bin/chromium-test \
+        -- go test {{ packages }}
 
 fmt-check:
     #!/usr/bin/env nu
