@@ -2,22 +2,31 @@ package daemon
 
 import (
 	"crypto/rand"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/jruz/chrome-cli/internal/browser"
+	"github.com/jruz/chrome-cli/internal/commands"
+	"github.com/jruz/chrome-cli/internal/page"
 	"github.com/jruz/chrome-cli/internal/protocol"
 )
 
 const idLength = 4
 
+type session struct {
+	target    protocol.Target
+	owned     *browser.Owned
+	external  *browser.External
+	page      *page.Page
+	emulation commands.Emulation
+}
+
 type state struct {
 	capacity    capacity
 	activity    activity
 	idleTimeout time.Duration
-	owned       map[string]*browser.Owned
-	external    map[int]*browser.External
+	sessions    map[string]session
+	shots       map[string]int
 }
 
 type event interface {
@@ -34,8 +43,8 @@ func newStore(limit int, idleTimeout time.Duration) store {
 		capacity:    capacity{limit: limit},
 		activity:    activity{},
 		idleTimeout: idleTimeout,
-		owned:       map[string]*browser.Owned{},
-		external:    map[int]*browser.External{},
+		sessions:    map[string]session{},
+		shots:       map[string]int{},
 	}
 	go s.run(initial)
 	return s
@@ -53,10 +62,20 @@ func ask[T any](s store, build func(chan T) event) T {
 	return <-reply
 }
 
+func (s *state) ownedCount() int {
+	count := 0
+	for _, current := range s.sessions {
+		if current.owned != nil {
+			count++
+		}
+	}
+	return count
+}
+
 type launchReserved struct{ reply chan error }
 
 func (e launchReserved) apply(s *state) {
-	next, err := s.capacity.reserve(len(s.owned))
+	next, err := s.capacity.reserve(s.ownedCount())
 	s.capacity = next
 	e.reply <- err
 }
@@ -70,54 +89,84 @@ func (e launchFailed) apply(s *state) {
 
 type launchConfirmed struct {
 	owned *browser.Owned
-	reply chan string
+	page  *page.Page
+	reply chan session
 }
 
 func (e launchConfirmed) apply(s *state) {
-	id := unusedID(s.owned)
+	target := protocol.Target{Session: unusedID(s.sessions)}
+	confirmed := session{target: target, owned: e.owned, page: e.page}
 	s.capacity = s.capacity.settle()
-	s.owned[id] = e.owned
-	s.activity.touch(protocol.SessionKey(id), time.Now())
-	e.reply <- id
+	s.sessions[target.Key()] = confirmed
+	s.activity.touch(target.Key(), time.Now())
+	e.reply <- confirmed
+}
+
+type externalRegistered struct {
+	candidate session
+	reply     chan session
+}
+
+func (e externalRegistered) apply(s *state) {
+	key := e.candidate.target.Key()
+	if existing, found := s.sessions[key]; found {
+		e.reply <- existing
+		return
+	}
+	s.sessions[key] = e.candidate
+	e.reply <- e.candidate
 }
 
 type sessionRemoved struct {
-	id    string
+	key   string
 	reply chan struct{}
 }
 
 func (e sessionRemoved) apply(s *state) {
-	delete(s.owned, e.id)
-	delete(s.activity, protocol.SessionKey(e.id))
+	delete(s.sessions, e.key)
+	delete(s.activity, e.key)
+	delete(s.shots, e.key)
 	e.reply <- struct{}{}
 }
 
-type externalRemoved struct {
-	port  int
-	reply chan struct{}
-}
-
-func (e externalRemoved) apply(s *state) {
-	delete(s.external, e.port)
-	e.reply <- struct{}{}
+type lookup struct {
+	session session
+	found   bool
 }
 
 type sessionLookedUp struct {
-	id    string
-	reply chan *browser.Owned
+	key   string
+	reply chan lookup
 }
 
 func (e sessionLookedUp) apply(s *state) {
-	e.reply <- s.owned[e.id]
+	current, found := s.sessions[e.key]
+	e.reply <- lookup{session: current, found: found}
 }
 
-type externalLookedUp struct {
-	port  int
-	reply chan *browser.External
+type emulationChanged struct {
+	key       string
+	emulation commands.Emulation
+	reply     chan struct{}
 }
 
-func (e externalLookedUp) apply(s *state) {
-	e.reply <- s.external[e.port]
+func (e emulationChanged) apply(s *state) {
+	current, found := s.sessions[e.key]
+	if found {
+		current.emulation = e.emulation
+		s.sessions[e.key] = current
+	}
+	e.reply <- struct{}{}
+}
+
+type shotNumbered struct {
+	key   string
+	reply chan int
+}
+
+func (e shotNumbered) apply(s *state) {
+	s.shots[e.key]++
+	e.reply <- s.shots[e.key]
 }
 
 type commandStarted struct {
@@ -143,11 +192,10 @@ func (e commandFinished) apply(s *state) {
 type idleQueried struct{ reply chan []protocol.Target }
 
 func (e idleQueried) apply(s *state) {
-	keys := s.activity.expired(time.Now(), s.idleTimeout)
 	var targets []protocol.Target
-	for id := range s.owned {
-		if slices.Contains(keys, protocol.SessionKey(id)) {
-			targets = append(targets, protocol.Target{Session: id})
+	for _, key := range s.activity.expired(time.Now(), s.idleTimeout) {
+		if current, found := s.sessions[key]; found {
+			targets = append(targets, current.target)
 		}
 	}
 	e.reply <- targets
@@ -156,12 +204,9 @@ func (e idleQueried) apply(s *state) {
 type targetsQueried struct{ reply chan []protocol.Target }
 
 func (e targetsQueried) apply(s *state) {
-	targets := make([]protocol.Target, 0, len(s.owned)+len(s.external))
-	for id := range s.owned {
-		targets = append(targets, protocol.Target{Session: id})
-	}
-	for port := range s.external {
-		targets = append(targets, protocol.Target{Port: port})
+	targets := make([]protocol.Target, 0, len(s.sessions))
+	for _, current := range s.sessions {
+		targets = append(targets, current.target)
 	}
 	e.reply <- targets
 }
@@ -169,21 +214,25 @@ func (e targetsQueried) apply(s *state) {
 type statusQueried struct{ reply chan protocol.Status }
 
 func (e statusQueried) apply(s *state) {
-	sessions := make([]protocol.Session, 0, len(s.owned))
-	for id, owned := range s.owned {
-		sessions = append(sessions, protocol.Session{ID: id, Pid: owned.Pid, Profile: owned.Profile})
+	status := protocol.Status{Sessions: []protocol.Session{}, Ports: []int{}}
+	for _, current := range s.sessions {
+		if current.owned == nil {
+			status.Ports = append(status.Ports, current.target.Port)
+			continue
+		}
+		status.Sessions = append(status.Sessions, protocol.Session{
+			ID:      current.target.Session,
+			Pid:     current.owned.Pid,
+			Profile: current.owned.Profile,
+		})
 	}
-	ports := make([]int, 0, len(s.external))
-	for port := range s.external {
-		ports = append(ports, port)
-	}
-	e.reply <- protocol.Status{Sessions: sessions, Ports: ports}
+	e.reply <- status
 }
 
-func unusedID(owned map[string]*browser.Owned) string {
+func unusedID(sessions map[string]session) string {
 	for {
 		id := strings.ToLower(rand.Text()[:idLength])
-		if _, taken := owned[id]; !taken {
+		if _, taken := sessions[protocol.Target{Session: id}.Key()]; !taken {
 			return id
 		}
 	}

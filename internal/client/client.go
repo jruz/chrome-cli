@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os/exec"
@@ -37,11 +38,11 @@ func New(runtimeDir string, daemon []string) Client {
 	return Client{runtimeDir: runtimeDir, daemon: daemon, http: &http.Client{Transport: transport}}
 }
 
-func (c Client) Call(ctx context.Context, action string, params, result any) error {
+func (c Client) Call(ctx context.Context, action string, target *protocol.Target, params, result any) error {
 	if err := rundir.Ensure(c.runtimeDir); err != nil {
 		return err
 	}
-	body, err := encode(action, params)
+	body, err := encode(action, target, params)
 	if err != nil {
 		return err
 	}
@@ -57,16 +58,16 @@ func (c Client) Call(ctx context.Context, action string, params, result any) err
 	return decode(response, result)
 }
 
-func (c Client) Send(ctx context.Context, action string, params, result any) error {
+func (c Client) Send(ctx context.Context, action string, target *protocol.Target, params, result any) error {
 	if err := c.Ensure(ctx); err != nil {
 		return err
 	}
-	return c.Call(ctx, action, params, result)
+	return c.Call(ctx, action, target, params, result)
 }
 
 func (c Client) Status(ctx context.Context) (protocol.Status, bool, error) {
 	var status protocol.Status
-	err := c.Call(ctx, protocol.ActionStatus, nil, &status)
+	err := c.Call(ctx, protocol.ActionStatus, nil, nil, &status)
 	if unreachable(err) {
 		return protocol.Status{}, false, nil
 	}
@@ -91,7 +92,7 @@ func (c Client) Start(ctx context.Context) (bool, error) {
 
 func (c Client) Stop(ctx context.Context) (protocol.Killed, error) {
 	var killed protocol.Killed
-	if err := c.Call(ctx, protocol.ActionShutdown, nil, &killed); err != nil {
+	if err := c.Call(ctx, protocol.ActionShutdown, nil, nil, &killed); err != nil {
 		return protocol.Killed{}, err
 	}
 	return killed, c.waitFor(ctx, false)
@@ -136,15 +137,18 @@ func transition(running bool) string {
 }
 
 func unreachable(err error) bool {
-	return errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET)
+	return errors.Is(err, syscall.ENOENT) ||
+		errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, io.EOF)
 }
 
-func encode(action string, params any) ([]byte, error) {
+func encode(action string, target *protocol.Target, params any) ([]byte, error) {
 	raw, err := json.Marshal(params)
 	if err != nil {
 		return nil, fmt.Errorf("encode %s params: %w", action, err)
 	}
-	return json.Marshal(protocol.Request{Action: action, Params: raw})
+	return json.Marshal(protocol.Request{Action: action, Target: target, Params: raw})
 }
 
 func decode(response *http.Response, result any) error {

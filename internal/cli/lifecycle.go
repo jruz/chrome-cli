@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jruz/chrome-cli/internal/daemon"
@@ -11,17 +12,18 @@ import (
 )
 
 type launchCmd struct {
-	Headed bool `help:"Show the browser window."`
+	Headed  bool          `help:"Show the browser window."`
+	URL     string        `help:"Load this URL after launching."`
+	Timeout time.Duration `default:"10s" help:"How long to wait for --url to load."`
 }
 
 func (c launchCmd) Run(a *app) error {
 	var launched protocol.Launched
-	params := protocol.LaunchParams{Headless: !c.Headed}
-	if err := a.client.Send(a.ctx, protocol.ActionLaunch, params, &launched); err != nil {
+	params := protocol.LaunchParams{Headless: !c.Headed, URL: c.URL, Timeout: c.Timeout}
+	if err := a.client.Send(a.ctx, protocol.ActionLaunch, nil, params, &launched); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintln(a.out, launched.Session)
-	return err
+	return a.printer.Print(launched, launched.Session)
 }
 
 type killCmd struct {
@@ -30,11 +32,10 @@ type killCmd struct {
 
 func (c killCmd) Run(a *app) error {
 	var killed protocol.Killed
-	params := protocol.KillParams{Target: c.protocol()}
-	if err := a.client.Send(a.ctx, protocol.ActionKill, params, &killed); err != nil {
+	if err := a.client.Send(a.ctx, protocol.ActionKill, c.protocol(), nil, &killed); err != nil {
 		return err
 	}
-	return printKilled(a, killed)
+	return a.printer.Print(killed, killedLines(killed)...)
 }
 
 type killAllCmd struct {
@@ -46,10 +47,10 @@ func (c killAllCmd) Run(a *app) error {
 		return stopOrphans(a)
 	}
 	var killed protocol.Killed
-	if err := a.client.Send(a.ctx, protocol.ActionKillAll, nil, &killed); err != nil {
+	if err := a.client.Send(a.ctx, protocol.ActionKillAll, nil, nil, &killed); err != nil {
 		return err
 	}
-	return printKilled(a, killed)
+	return a.printer.Print(killed, killedLines(killed)...)
 }
 
 func stopOrphans(a *app) error {
@@ -57,14 +58,18 @@ func stopOrphans(a *app) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(a.out, "stopped daemons %v browsers %v\n", stopped.Daemons, stopped.Browsers)
-	return err
+	return a.printer.Print(stopped, fmt.Sprintf("stopped daemons %v browsers %v", stopped.Daemons, stopped.Browsers))
 }
 
 type daemonStartCmd struct{}
 
+type started struct {
+	Started bool `json:"started"`
+	Pid     int  `json:"pid"`
+}
+
 func (daemonStartCmd) Run(a *app) error {
-	started, err := a.client.Start(a.ctx)
+	fresh, err := a.client.Start(a.ctx)
 	if err != nil {
 		return err
 	}
@@ -72,15 +77,19 @@ func (daemonStartCmd) Run(a *app) error {
 	if err != nil {
 		return err
 	}
-	if started {
-		_, err = fmt.Fprintf(a.out, "started daemon %d\n", status.Pid)
-		return err
+	result := started{Started: fresh, Pid: status.Pid}
+	if fresh {
+		return a.printer.Print(result, fmt.Sprintf("started daemon %d", status.Pid))
 	}
-	_, err = fmt.Fprintf(a.out, "daemon already running %d\n", status.Pid)
-	return err
+	return a.printer.Print(result, fmt.Sprintf("daemon already running %d", status.Pid))
 }
 
 type daemonStatusCmd struct{}
+
+type daemonState struct {
+	Running bool `json:"running"`
+	protocol.Status
+}
 
 func (daemonStatusCmd) Run(a *app) error {
 	status, running, err := a.client.Status(a.ctx)
@@ -88,10 +97,9 @@ func (daemonStatusCmd) Run(a *app) error {
 		return err
 	}
 	if !running {
-		_, err = fmt.Fprintln(a.out, "daemon not running")
-		return err
+		return a.printer.Print(daemonState{Running: false}, "daemon not running")
 	}
-	return printStatus(a, status)
+	return a.printer.Print(daemonState{Running: true, Status: status}, statusLines(status)...)
 }
 
 type daemonStopCmd struct{}
@@ -108,11 +116,7 @@ func (daemonStopCmd) Run(a *app) error {
 	if err != nil {
 		return err
 	}
-	if err := printKilled(a, killed); err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(a.out, "stopped daemon")
-	return err
+	return a.printer.Print(killed, append(killedLines(killed), "stopped daemon")...)
 }
 
 type daemonServeCmd struct {
@@ -131,28 +135,21 @@ func (c daemonServeCmd) Run() error {
 	})
 }
 
-func printKilled(a *app, killed protocol.Killed) error {
-	for _, target := range killed.Killed {
-		if _, err := fmt.Fprintf(a.out, "killed %s\n", target.Key()); err != nil {
-			return err
-		}
+func killedLines(killed protocol.Killed) []string {
+	lines := make([]string, len(killed.Killed))
+	for index, target := range killed.Killed {
+		lines[index] = "killed " + target.Key()
 	}
-	return nil
+	return lines
 }
 
-func printStatus(a *app, status protocol.Status) error {
-	if _, err := fmt.Fprintf(a.out, "daemon running %d\n", status.Pid); err != nil {
-		return err
-	}
+func statusLines(status protocol.Status) []string {
+	lines := []string{"daemon running " + strconv.Itoa(status.Pid)}
 	for _, session := range status.Sessions {
-		if _, err := fmt.Fprintf(a.out, "session %s pid %d\n", session.ID, session.Pid); err != nil {
-			return err
-		}
+		lines = append(lines, fmt.Sprintf("session %s pid %d", session.ID, session.Pid))
 	}
 	for _, port := range status.Ports {
-		if _, err := fmt.Fprintf(a.out, "port %d\n", port); err != nil {
-			return err
-		}
+		lines = append(lines, fmt.Sprintf("port %d", port))
 	}
-	return nil
+	return lines
 }

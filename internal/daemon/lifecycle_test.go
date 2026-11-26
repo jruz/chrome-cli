@@ -15,13 +15,14 @@ import (
 	"github.com/jruz/chrome-cli/internal/cli"
 	"github.com/jruz/chrome-cli/internal/client"
 	"github.com/jruz/chrome-cli/internal/protocol"
+	"github.com/jruz/chrome-cli/internal/rundir"
 )
 
 const exitTimeout = 10 * time.Second
 
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == "daemon-serve" {
-		os.Exit(cli.Run(os.Args[1:]))
+		os.Exit(cli.Main(os.Args[1:], cli.Env{Out: os.Stdout, Err: os.Stderr}))
 	}
 	os.Exit(m.Run())
 }
@@ -48,19 +49,24 @@ func start(t *testing.T, flags ...string) harness {
 }
 
 func (h harness) stop(t *testing.T) {
+	if t.Failed() {
+		logged, err := os.ReadFile(rundir.Log(h.dir))
+		t.Logf("daemon log (%v):\n%s", err, logged)
+	}
 	_, running, err := h.client.Status(context.Background())
 	if err != nil || !running {
 		return
 	}
 	if _, err := h.client.Stop(context.Background()); err != nil {
-		t.Errorf("stop daemon: %v", err)
+		logged, readErr := os.ReadFile(rundir.Log(h.dir))
+		t.Errorf("stop daemon: %v\ndaemon log (%v):\n%s", err, readErr, logged)
 	}
 }
 
 func (h harness) launch(t *testing.T) protocol.Session {
 	t.Helper()
 	var launched protocol.Launched
-	if err := h.client.Send(context.Background(), protocol.ActionLaunch, protocol.LaunchParams{Headless: true}, &launched); err != nil {
+	if err := h.client.Send(context.Background(), protocol.ActionLaunch, nil, protocol.LaunchParams{Headless: true}, &launched); err != nil {
 		t.Fatalf("launch: %v", err)
 	}
 	return h.session(t, launched.Session)
@@ -119,8 +125,8 @@ func TestKillByPortClosesExternalChrome(t *testing.T) {
 	external := startUnrelatedChrome(t)
 
 	var killed protocol.Killed
-	params := protocol.KillParams{Target: protocol.Target{Port: external.port}}
-	if err := h.client.Send(context.Background(), protocol.ActionKill, params, &killed); err != nil {
+	target := &protocol.Target{Port: external.port}
+	if err := h.client.Send(context.Background(), protocol.ActionKill, target, nil, &killed); err != nil {
 		t.Fatalf("kill --port: %v", err)
 	}
 
@@ -134,7 +140,7 @@ func TestKillAllLeavesUnrelatedChromeRunning(t *testing.T) {
 	tree := processTree(t, session.Pid)
 
 	var killed protocol.Killed
-	if err := h.client.Send(context.Background(), protocol.ActionKillAll, nil, &killed); err != nil {
+	if err := h.client.Send(context.Background(), protocol.ActionKillAll, nil, nil, &killed); err != nil {
 		t.Fatalf("kill-all: %v", err)
 	}
 
@@ -169,7 +175,7 @@ func TestParallelLaunchesCannotExceedTheLimit(t *testing.T) {
 	for range 10 {
 		group.Go(func() {
 			var launched protocol.Launched
-			errs <- h.client.Send(context.Background(), protocol.ActionLaunch, protocol.LaunchParams{Headless: true}, &launched)
+			errs <- h.client.Send(context.Background(), protocol.ActionLaunch, nil, protocol.LaunchParams{Headless: true}, &launched)
 		})
 	}
 	group.Wait()

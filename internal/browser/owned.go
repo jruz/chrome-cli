@@ -16,6 +16,7 @@ var baseArgs = []string{
 	"--allow-pre-commit-input",
 	"--disable-background-networking",
 	"--disable-background-timer-throttling",
+	"--disable-back-forward-cache",
 	"--disable-backgrounding-occluded-windows",
 	"--disable-breakpad",
 	"--disable-client-side-phishing-detection",

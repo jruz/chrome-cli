@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jruz/chrome-cli/internal/commands"
 	"github.com/jruz/chrome-cli/internal/protocol"
 	"github.com/jruz/chrome-cli/internal/rundir"
 )
@@ -27,7 +28,7 @@ type Config struct {
 	ReapInterval time.Duration
 }
 
-type handler func(context.Context, json.RawMessage) (any, error)
+type handler func(context.Context, *protocol.Target, json.RawMessage) (any, error)
 
 func Serve(config Config) error {
 	if err := rundir.Ensure(config.RuntimeDir); err != nil {
@@ -93,11 +94,19 @@ func listen(socket string) (net.Listener, error) {
 
 func (d daemon) routes() http.Handler {
 	handlers := map[string]handler{
-		protocol.ActionLaunch:   decoded(d.launch),
-		protocol.ActionKill:     d.targeted(decoded(d.kill)),
-		protocol.ActionKillAll:  decoded(d.killAll),
-		protocol.ActionStatus:   decoded(d.status),
-		protocol.ActionShutdown: decoded(d.shutdown),
+		protocol.ActionLaunch:     untargeted(d.launch),
+		protocol.ActionKill:       targeted(d, d.kill),
+		protocol.ActionKillAll:    untargeted(d.killAll),
+		protocol.ActionStatus:     untargeted(d.status),
+		protocol.ActionShutdown:   untargeted(d.shutdown),
+		protocol.ActionOneshot:    untargeted(d.oneshot),
+		protocol.ActionNavigate:   targeted(d, onPage(commands.Navigate)),
+		protocol.ActionReload:     targeted(d, onPage(commands.Reload)),
+		protocol.ActionBack:       targeted(d, onPage(commands.Back)),
+		protocol.ActionSnapshot:   targeted(d, onPage(commands.Snapshot)),
+		protocol.ActionEval:       targeted(d, onPage(commands.Evaluate)),
+		protocol.ActionScreenshot: targeted(d, d.screenshot),
+		protocol.ActionEmulate:    targeted(d, d.emulate),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /command", func(w http.ResponseWriter, r *http.Request) {
@@ -108,26 +117,45 @@ func (d daemon) routes() http.Handler {
 	return mux
 }
 
-func (d daemon) targeted(run handler) handler {
-	return func(ctx context.Context, raw json.RawMessage) (any, error) {
-		var params protocol.KillParams
-		if err := json.Unmarshal(raw, &params); err != nil {
-			return nil, fmt.Errorf("invalid target: %w", err)
-		}
-		return d.track(params.Target.Key(), func() (any, error) { return run(ctx, raw) })
-	}
-}
-
-func decoded[P, R any](run func(context.Context, P) (R, error)) handler {
-	return func(ctx context.Context, raw json.RawMessage) (any, error) {
-		var params P
-		if len(raw) > 0 {
-			if err := json.Unmarshal(raw, &params); err != nil {
-				return nil, fmt.Errorf("invalid params: %w", err)
-			}
+func untargeted[P, R any](run func(context.Context, P) (R, error)) handler {
+	return func(ctx context.Context, _ *protocol.Target, raw json.RawMessage) (any, error) {
+		params, err := decode[P](raw)
+		if err != nil {
+			return nil, err
 		}
 		return run(ctx, params)
 	}
+}
+
+func targeted[P, R any](d daemon, run func(context.Context, session, P) (R, error)) handler {
+	return func(ctx context.Context, target *protocol.Target, raw json.RawMessage) (any, error) {
+		if target == nil {
+			return nil, errors.New("missing target (pass -s <session> or --port <port>)")
+		}
+		params, err := decode[P](raw)
+		if err != nil {
+			return nil, err
+		}
+		return tracked(d, *target, func() (R, error) {
+			current, err := d.resolve(ctx, *target)
+			if err != nil {
+				var none R
+				return none, err
+			}
+			return run(ctx, current, params)
+		})
+	}
+}
+
+func decode[P any](raw json.RawMessage) (P, error) {
+	var params P
+	if len(raw) == 0 {
+		return params, nil
+	}
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return params, fmt.Errorf("invalid params: %w", err)
+	}
+	return params, nil
 }
 
 type outcome struct {
@@ -144,7 +172,7 @@ func dispatch(r *http.Request, handlers map[string]handler) outcome {
 	if !found {
 		return outcome{err: fmt.Errorf("unknown action %q", request.Action)}
 	}
-	result, err := run(r.Context(), request.Params)
+	result, err := run(r.Context(), request.Target, request.Params)
 	return outcome{result: result, err: err}
 }
 
