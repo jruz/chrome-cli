@@ -1,6 +1,7 @@
 mod ts '.just/ts.justfile'
 mod bun '.just/bun.justfile'
 mod tools '.just/tools.just'
+mod go '.just/go.justfile'
 
 export REVISION := env("REVISION", shell("git rev-parse --short HEAD"))
 
@@ -9,14 +10,17 @@ setup:
 
 check:
     just ts::check
+    just go::check
 
 fix:
     just ts::fix
+    just go::fmt-fix
 
 test:
     just ts::test
     just bun::test
     just chrome-test
+    just go::test
 
 install:
     just chrome-daemon-check
@@ -55,6 +59,26 @@ chrome-install:
     let staged = (^mktemp $"($bin)/.chrome-cli.XXXXXX" | str trim)
     ^install --mode=755 dist/chrome-cli $staged
     ^mv --no-target-directory $staged ($bin | path join chrome-cli)
+
+go-build:
+    #!/usr/bin/env nu
+    let version = (open package.json | get version)
+    let build_time = (date now
+        | date to-timezone UTC
+        | format date "%Y-%m-%dT%H:%M:%SZ")
+    let package = "github.com/jruz/chrome-cli/internal/version"
+    let ldflags = ([
+        $"-X ($package).version=($version)"
+        $"-X ($package).revision=($env.REVISION)"
+        $"-X ($package).buildTime=($build_time)"
+    ] | str join " ")
+    mkdir dist
+    (^sandbox --env CGO_ENABLED=0 --
+        go build
+        -trimpath
+        -ldflags $ldflags
+        -o dist/chrome-cli
+        ./cmd/chrome-cli)
 
 chrome-bench:
     sandbox bun run bench.ts
