@@ -173,18 +173,22 @@ def pnpm-cache []: nothing -> path {
     $env.HOME | path join .cache pnpm
 }
 
-def go-module-cache []: nothing -> path {
-    $env.HOME | path join go pkg mod
+def go-path []: nothing -> path {
+    $env.HOME | path join go
 }
 
 def go-build-cache []: nothing -> path {
     $env.HOME | path join .cache go-build
 }
 
+def staticcheck-cache []: nothing -> path {
+    $env.HOME | path join .cache staticcheck
+}
+
 def cache-dirs [runtime: string]: nothing -> list<path> {
     match $runtime {
         bun => []
-        go => [(go-module-cache) (go-build-cache)]
+        go => [(go-path) (go-build-cache) (staticcheck-cache)]
         node => [(pnpm-store) (pnpm-cache)]
         rust => [($env.HOME | path join .cargo registry) ($env.HOME | path join .cargo git)]
     }
@@ -194,8 +198,9 @@ def runtime-env [runtime: string]: nothing -> list<string> {
     match $runtime {
         bun => []
         go => [
-            --env $"GOMODCACHE=(go-module-cache)"
+            --env $"GOPATH=(go-path)"
             --env $"GOCACHE=(go-build-cache)"
+            --env $"STATICCHECK_CACHE=(staticcheck-cache)"
             --env GOTOOLCHAIN=local
         ]
         node => [

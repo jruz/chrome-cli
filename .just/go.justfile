@@ -25,6 +25,4 @@ vet-check:
     sandbox go vet {{ packages }}
 
 staticcheck-check:
-    sandbox \
-        --env STATICCHECK_CACHE=/tmp/staticcheck \
-        -- go tool staticcheck {{ packages }}
+    sandbox go tool staticcheck {{ packages }}
