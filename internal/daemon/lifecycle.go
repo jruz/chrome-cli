@@ -48,7 +48,7 @@ func (d daemon) launchSession(ctx context.Context, headless bool) (session, erro
 	}
 	starting, cancel := context.WithTimeout(ctx, launchTimeout)
 	defer cancel()
-	owned, first, err := startBrowser(starting, headless)
+	owned, first, err := d.startBrowser(starting, headless)
 	if err != nil {
 		ask(d.store, func(reply chan struct{}) event { return launchFailed{reply: reply} })
 		return session{}, err
@@ -59,12 +59,12 @@ func (d daemon) launchSession(ctx context.Context, headless bool) (session, erro
 	return launched, nil
 }
 
-func startBrowser(ctx context.Context, headless bool) (*browser.Owned, *page.Page, error) {
+func (d daemon) startBrowser(ctx context.Context, headless bool) (*browser.Owned, *page.Page, error) {
 	owned, err := browser.Launch(ctx, headless)
 	if err != nil {
 		return nil, nil, err
 	}
-	first, err := page.First(ctx, owned.Conn)
+	first, err := page.First(ctx, owned.Conn, d.reportPageError)
 	if err != nil {
 		return nil, nil, errors.Join(err, owned.Kill())
 	}
@@ -105,7 +105,7 @@ func (d daemon) connect(ctx context.Context, target protocol.Target) (session, e
 	if err != nil {
 		return session{}, err
 	}
-	first, err := page.First(ctx, external.Conn)
+	first, err := page.First(ctx, external.Conn, d.reportPageError)
 	if err != nil {
 		return session{}, errors.Join(err, external.Disconnect())
 	}
@@ -195,6 +195,10 @@ func (d daemon) closeBrowser(ctx context.Context, current session) error {
 	}
 	d.log.Warn("close failed, killing browser", "session", current.target.Session, "pid", current.owned.Pid, "error", err)
 	return current.owned.Kill()
+}
+
+func (d daemon) reportPageError(err error) {
+	d.log.Error("page event handling failed", "error", err)
 }
 
 func (d daemon) remove(target protocol.Target) {

@@ -30,30 +30,44 @@ type attached struct {
 	SessionID string `json:"sessionId"`
 }
 
-func First(ctx context.Context, conn *cdp.Conn) (*Page, error) {
+func First(ctx context.Context, conn *cdp.Conn, report func(error)) (*Page, error) {
 	var found targets
 	if err := conn.Call(ctx, "", "Target.getTargets", nil, &found); err != nil {
 		return nil, err
 	}
 	for _, info := range found.TargetInfos {
 		if info.Type == "page" {
-			return Attach(ctx, conn, info.TargetID)
+			return Attach(ctx, conn, info.TargetID, report)
 		}
 	}
 	return nil, errNoPage
 }
 
-func Attach(ctx context.Context, conn *cdp.Conn, targetID string) (*Page, error) {
+func Attach(ctx context.Context, conn *cdp.Conn, targetID string, report func(error)) (*Page, error) {
 	var session attached
 	params := map[string]any{"targetId": targetID, "flatten": true}
 	if err := conn.Call(ctx, "", "Target.attachToTarget", params, &session); err != nil {
 		return nil, err
 	}
 	p := &Page{conn: conn, TargetID: targetID, SessionID: session.SessionID}
+	events, _ := p.Subscribe()
+	go p.acceptDialogs(events, report)
 	if err := p.enable(ctx); err != nil {
 		return nil, err
 	}
 	return p, nil
+}
+
+func (p *Page) acceptDialogs(events <-chan cdp.Event, report func(error)) {
+	for event := range events {
+		if event.Method != "Page.javascriptDialogOpening" {
+			continue
+		}
+		params := map[string]bool{"accept": true}
+		if err := p.Call(context.Background(), "Page.handleJavaScriptDialog", params, nil); err != nil {
+			report(fmt.Errorf("accept dialog: %w", err))
+		}
+	}
 }
 
 func (p *Page) enable(ctx context.Context) error {
@@ -64,6 +78,7 @@ func (p *Page) enable(ctx context.Context) error {
 		{"Page.enable", nil},
 		{"Page.setLifecycleEventsEnabled", map[string]bool{"enabled": true}},
 		{"Runtime.enable", nil},
+		{"Network.enable", nil},
 	}
 	for _, step := range steps {
 		if err := p.Call(ctx, step.method, step.params, nil); err != nil {

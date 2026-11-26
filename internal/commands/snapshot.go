@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -69,25 +68,18 @@ func build(byID map[string]page.AXNode, id string) (axTree, bool) {
 		}
 		return axTree{role: "group", uid: node.NodeID, children: children}, true
 	}
+	role := page.Text(node.Role)
+	if role == "" {
+		role = "none"
+	}
 	return axTree{
-		role:        textOf(node.Role, "none"),
-		name:        textOf(node.Name, ""),
+		role:        role,
+		name:        page.Text(node.Name),
 		uid:         node.NodeID,
-		value:       textOf(node.Value, ""),
-		description: textOf(node.Description, ""),
+		value:       page.Text(node.Value),
+		description: page.Text(node.Description),
 		children:    children,
 	}, true
-}
-
-func textOf(value *page.AXValue, fallback string) string {
-	if value == nil || len(value.Value) == 0 {
-		return fallback
-	}
-	var text string
-	if err := json.Unmarshal(value.Value, &text); err == nil {
-		return text
-	}
-	return string(value.Value)
 }
 
 func format(tree axTree, depth int, verbose bool, lines *[]string) {

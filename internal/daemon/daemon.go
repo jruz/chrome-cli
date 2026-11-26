@@ -107,6 +107,14 @@ func (d daemon) routes() http.Handler {
 		protocol.ActionEval:       targeted(d, onPage(commands.Evaluate)),
 		protocol.ActionScreenshot: targeted(d, d.screenshot),
 		protocol.ActionEmulate:    targeted(d, d.emulate),
+		protocol.ActionClick:      targeted(d, acting(d, commands.Click)),
+		protocol.ActionHover:      targeted(d, acting(d, commands.Hover)),
+		protocol.ActionFill:       targeted(d, acting(d, commands.Fill)),
+		protocol.ActionFillForm:   targeted(d, acting(d, commands.FillForm)),
+		protocol.ActionPress:      targeted(d, acting(d, commands.Press)),
+		protocol.ActionDrag:       targeted(d, acting(d, commands.Drag)),
+		protocol.ActionScroll:     targeted(d, acting(d, commands.Scroll)),
+		protocol.ActionWait:       targeted(d, onPage(commands.WaitForText)),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /command", func(w http.ResponseWriter, r *http.Request) {

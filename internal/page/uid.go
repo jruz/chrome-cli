@@ -21,6 +21,17 @@ type AXNode struct {
 	BackendDOMNodeID int      `json:"backendDOMNodeId"`
 }
 
+func Text(value *AXValue) string {
+	if value == nil || len(value.Value) == 0 {
+		return ""
+	}
+	var text string
+	if err := json.Unmarshal(value.Value, &text); err == nil {
+		return text
+	}
+	return string(value.Value)
+}
+
 type axTree struct {
 	Nodes []AXNode `json:"nodes"`
 }
@@ -62,10 +73,33 @@ func (p *Page) resolveNode(ctx context.Context, uid string, byID map[string]AXNo
 	if !found || node.BackendDOMNodeID == 0 {
 		return "", fmt.Errorf("element uid=%s not found (take a new chrome-cli snapshot)", uid)
 	}
+	return p.ObjectID(ctx, node.BackendDOMNodeID)
+}
+
+func (p *Page) ObjectID(ctx context.Context, backendNodeID int) (string, error) {
 	var result resolved
-	params := map[string]int{"backendNodeId": node.BackendDOMNodeID}
+	params := map[string]int{"backendNodeId": backendNodeID}
 	if err := p.Call(ctx, "DOM.resolveNode", params, &result); err != nil {
 		return "", err
 	}
 	return result.Object.ObjectID, nil
+}
+
+func (p *Page) CallWith(ctx context.Context, objectID, function string, values ...any) (RemoteObject, error) {
+	arguments := make([]map[string]any, len(values))
+	for index, value := range values {
+		arguments[index] = map[string]any{"value": value}
+	}
+	params := map[string]any{
+		"functionDeclaration": function,
+		"objectId":            objectID,
+		"arguments":           arguments,
+		"returnByValue":       true,
+		"awaitPromise":        true,
+	}
+	var result evaluation
+	if err := p.Call(ctx, "Runtime.callFunctionOn", params, &result); err != nil {
+		return RemoteObject{}, err
+	}
+	return result.Result, thrown(result.ExceptionDetails)
 }

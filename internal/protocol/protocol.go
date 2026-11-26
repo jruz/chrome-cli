@@ -20,6 +20,14 @@ const (
 	ActionEval       = "eval"
 	ActionEmulate    = "emulate"
 	ActionOneshot    = "oneshot"
+	ActionClick      = "click"
+	ActionHover      = "hover"
+	ActionFill       = "fill"
+	ActionFillForm   = "fill-form"
+	ActionPress      = "press"
+	ActionDrag       = "drag"
+	ActionScroll     = "scroll"
+	ActionWait       = "wait"
 )
 
 type Request struct {
@@ -143,6 +151,90 @@ type EmulateParams struct {
 
 type Emulated struct {
 	Applied []string `json:"applied"`
+}
+
+type ActionOptions struct {
+	NoWait     bool          `json:"noWait"`
+	WaitFor    []string      `json:"waitFor,omitempty"`
+	Timeout    time.Duration `json:"timeout"`
+	Snapshot   bool          `json:"snapshot"`
+	Screenshot bool          `json:"screenshot"`
+}
+
+type Dialog struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+type Acted struct {
+	Action      string       `json:"action"`
+	Settled     bool         `json:"settled"`
+	Dialogs     []Dialog     `json:"dialogs,omitempty"`
+	Found       string       `json:"found,omitempty"`
+	Snapshot    *Snapshot    `json:"snapshot,omitempty"`
+	Screenshots *Screenshots `json:"screenshots,omitempty"`
+}
+
+type ClickParams struct {
+	Target  string        `json:"target"`
+	Double  bool          `json:"double"`
+	Options ActionOptions `json:"options"`
+}
+
+type HoverParams struct {
+	Target  string        `json:"target"`
+	Options ActionOptions `json:"options"`
+}
+
+type FillParams struct {
+	Target  string        `json:"target"`
+	Value   string        `json:"value"`
+	Options ActionOptions `json:"options"`
+}
+
+type Field struct {
+	Target string `json:"target"`
+	Value  string `json:"value"`
+}
+
+type FillFormParams struct {
+	Fields  []Field       `json:"fields"`
+	Submit  string        `json:"submit,omitempty"`
+	Options ActionOptions `json:"options"`
+}
+
+type PressParams struct {
+	Key     string        `json:"key"`
+	Options ActionOptions `json:"options"`
+}
+
+type DragParams struct {
+	From    string        `json:"from"`
+	To      string        `json:"to"`
+	Options ActionOptions `json:"options"`
+}
+
+type ScrollParams struct {
+	Target  string        `json:"target,omitempty"`
+	By      int           `json:"by,omitempty"`
+	Options ActionOptions `json:"options"`
+}
+
+func (p ClickParams) Settings() ActionOptions    { return p.Options }
+func (p HoverParams) Settings() ActionOptions    { return p.Options }
+func (p FillParams) Settings() ActionOptions     { return p.Options }
+func (p FillFormParams) Settings() ActionOptions { return p.Options }
+func (p PressParams) Settings() ActionOptions    { return p.Options }
+func (p DragParams) Settings() ActionOptions     { return p.Options }
+func (p ScrollParams) Settings() ActionOptions   { return p.Options }
+
+type WaitParams struct {
+	Texts   []string      `json:"texts"`
+	Timeout time.Duration `json:"timeout"`
+}
+
+type Found struct {
+	Text string `json:"found"`
 }
 
 type OneshotParams struct {

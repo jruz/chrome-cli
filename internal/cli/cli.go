@@ -43,6 +43,14 @@ type root struct {
 	Screenshot   screenshotCmd   `cmd:"" help:"Save screenshots and print their paths."`
 	Eval         evalCmd         `cmd:"" help:"Evaluate JavaScript in the page and print the value."`
 	Emulate      emulateCmd      `cmd:"" help:"Emulate a device, color scheme, location, or network."`
+	Click        clickCmd        `cmd:"" help:"Click an element and wait for the page to settle."`
+	Fill         fillCmd         `cmd:"" help:"Replace an input's value, pick an option, or set a checkbox."`
+	FillForm     fillFormCmd     `cmd:"" name:"fill-form" help:"Fill fields by label and optionally submit."`
+	Press        pressCmd        `cmd:"" help:"Press a key in the focused element."`
+	Hover        hoverCmd        `cmd:"" help:"Move the mouse over an element."`
+	Drag         dragCmd         `cmd:"" help:"Drag one element onto another."`
+	Scroll       scrollCmd       `cmd:"" help:"Scroll the page and print the scroll position."`
+	Wait         waitCmd         `cmd:"" help:"Wait until any of the texts appears."`
 	Oneshot      oneshotCmd      `cmd:"" help:"Launch, load a URL, capture a snapshot or screenshot, and close."`
 	DaemonStart  daemonStartCmd  `cmd:"" name:"daemon-start" help:"Start the background daemon."`
 	DaemonStatus daemonStatusCmd `cmd:"" name:"daemon-status" help:"Show the daemon and its sessions."`
