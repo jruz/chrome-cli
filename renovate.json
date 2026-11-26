@@ -3,15 +3,16 @@
   "extends": ["config:recommended"],
   "enabledManagers": ["npm"],
   "rangeStrategy": "pin",
-  "minimumReleaseAge": "7 days",
   "semanticCommits": "disabled",
   "commitMessagePrefix": "[deps] {{{depName}}}:",
   "commitMessageTopic": "",
   "commitMessageLowerCase": "never",
+  "minimumReleaseAge": "7 days",
   "automerge": true,
   "automergeType": "pr",
   "platformAutomerge": true,
   "automergeStrategy": "squash",
+  "rebaseWhen": "behind-base-branch",
   "packageRules": [
     {
       "matchPackageNames": ["bun", "@types/bun"],

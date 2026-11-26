@@ -52,20 +52,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 ## Release
 
-CI release workflow via Woodpecker. To release a new version:
-
-1. `just release-bump <version>` — bumps `package.json` and commits
-2. `git push` — pushes to main
-3. CI auto-creates git tag from `package.json` version (`.woodpecker/tag.yml`)
-4. Tag event triggers release pipeline (`.woodpecker/release.yml`)
-5. CI cross-compiles 4 binaries (linux-x64, linux-arm64, darwin-x64, darwin-arm64) via `bun build --compile`
-6. CI creates Codeberg release and uploads binaries
-
-### Release scripts
-
-- `scripts/release-bump.nu` — bumps `package.json` version and commits
-- `scripts/release-upload.ts` — creates Codeberg release and uploads binaries from `dist/`
-- `scripts/release-delete.ts` — deletes tag + release (local, remote, and Codeberg)
+Releases are paused until the Go cutover adds a GitHub release pipeline.
 
 ## Commands
 

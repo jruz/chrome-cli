@@ -15,18 +15,18 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 ### Nix (flake)
 
 ```
-nix run codeberg:jruz/chrome-cli -- launch
+nix run github:jruz/chrome-cli -- launch
 ```
 
 Or add to your flake inputs:
 
 ```nix
-chrome-cli.url = "codeberg:jruz/chrome-cli";
+chrome-cli.url = "github:jruz/chrome-cli";
 ```
 
 ### Pre-built binaries
 
-Download from [Codeberg releases](https://codeberg.org/jruz/chrome-cli/releases).
+Download from [GitHub releases](https://github.com/jruz/chrome-cli/releases).
 
 ## Usage
 
@@ -108,7 +108,7 @@ cp -r skills/chrome ~/.claude/skills/
 
 ## AI disclaimer
 
-This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by the [Oxlint configuration](.oxlintrc.json) and [slop-detector](https://codeberg.org/jruz/slop-detector).
+This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by the [Oxlint configuration](.oxlintrc.json) and [slop-detector](https://github.com/jruz/slop-detector).
 
 ## License
 

@@ -1,20 +1,23 @@
 repo:
   name: jruz/chrome-cli
 secrets:
-  CODEBERG_TOKEN:
+  GITHUB_TOKEN:
     events:
       - tag
       - push
+      - manual
     images: null
     value: |
       -----BEGIN AGE ENCRYPTED FILE-----
-      YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHSHNWdUp4SmgvY2hLQzJW
-      REZxK0gvMndNSFRwMENPVUZXY2RQUXJGY0M4CjFVc0RBaDBoSjhGdGF5TjExL2cv
-      TzMzWmxRSzhiekZubnp2UWlFakNjTkEKLT4gY3tuRi1ncmVhc2UgSApiREcrRE1S
-      UjRsdDI0aVhUOGNiMHJnMzFFRkVxUlRZQ21NTWRuSHlqUmc2QlMvWkdaNEJScXhK
-      cHl3Tk55YU0KLS0tIEhmbDZpL25lNnpKWlJEejdXdk9YMmJ0UERyNEQ5NzZPa0J0
-      WkVqcnY2ZlEKZoOBNCpPn/ew11l4QRp2tQzsb9X+fck0L4A9fzw7NFwnDiUI6QTB
-      FB1gARyqb602EjO/coWJQAprj5361wgNDM3dRn3E86as
+      YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBjMmRBOGZidmJhdDBEN0pL
+      L1htYi9Cc0tKa2RSTE5KdDFiZW9ReURzWEEwCjdWQWlKMEZKMnJyQlg1QUNESUhF
+      eTJFSUQ3dDRLVkZBdlZRZUh1MlU4RUUKLT4gbTwtZ3JlYXNlICFUcC8gYVxBR0ss
+      ICMlMUkKVTRURHp2Z1NVQjdCQWFOU0t3NnZQZHd6QVJRTkt4UFhCRlVnaTBxV3A5
+      YWJvT0JFdW40d2xhNjh1NlMyQ3VTLwo4Y01lRFNlaXlFRXZ1ayt2cXhuanNtdVlh
+      aTd6c0VLZDVlbFQ1RXByOERUUmw5TEtZb3F2ZjRvOVlQdURPVmJRCi9QNAotLS0g
+      TDJLNEt1MjByQVlzQjV5MW1XbWsvUnBDUndpeWRIUE1ONmNBakhGVVZCQQr1zXLG
+      rBvXg3FK5EEm3x/VKwhBAqq4RtjyfP+x0LUW8QsbBv3HGkog9pSwycvDN2XR33sp
+      4B56zBdCaLbVdmFw/W0c8jea6/I=
       -----END AGE ENCRYPTED FILE-----
 settings:
   allow_deploy: false
@@ -28,5 +31,5 @@ settings:
   trusted:
     network: false
     security: false
-    volumes: true
+    volumes: false
   visibility: public
