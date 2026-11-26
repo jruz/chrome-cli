@@ -1,8 +1,16 @@
+import {
+  definePageCommand,
+  numberParam,
+  opt,
+  req,
+  textParam,
+  toggle,
+} from "../command.ts";
+
 import type { Page } from "puppeteer-core";
 import { writeFile } from "fs/promises";
 import { z } from "zod";
 import { findByUid } from "./interact";
-import { definePageCommand } from "../command.ts";
 
 const RawAXNodeSchema = z.object({
   childIds: z.string().array().optional(),
@@ -166,3 +174,37 @@ export const screenshot = async (
   if (path) return JSON.stringify({ saved: path });
   return Buffer.from(buffer).toString("base64");
 };
+
+const ScreenshotParams = z
+  .object({
+    format: textParam("format"),
+    fullPage: toggle,
+    path: textParam("path").optional(),
+    quality: numberParam("quality").optional(),
+    uid: textParam("uid").optional(),
+  })
+  .readonly();
+
+export const screenshotCommand = definePageCommand(
+  {
+    description: "Take a screenshot",
+    flags: [
+      opt("--path <path>", "save to file"),
+      opt("--full-page", "capture full page"),
+      req("--format <format>", "png, jpeg, or webp"),
+      opt("--quality <n>", "compression quality 0-100 (jpeg/webp)"),
+      opt("--uid <uid>", "capture a single element"),
+    ],
+    name: "screenshot",
+    toPayload: (o) => ({
+      format: o["format"],
+      fullPage: !!o["fullPage"],
+      path: o["path"],
+      quality: o["quality"] ? Number(o["quality"]) : undefined,
+      uid: o["uid"],
+    }),
+  },
+  ScreenshotParams,
+  (page, { path, fullPage, format, quality, uid }) =>
+    screenshot(page, path, fullPage, format, quality, uid),
+);

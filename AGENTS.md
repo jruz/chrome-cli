@@ -22,15 +22,17 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 - `src/capacity.ts` — reserves browser slots before launch and releases them after confirmed exit
 - `src/activity.ts` — tracks last use and in-flight commands so idle owned browsers can be reaped
 - `src/daemon-lock.ts` — `flock` ownership lock so one daemon binds the socket
-- `src/commands/*.ts` — pure functions: take Page/Browser, return JSON string
+- `src/commands/` — each command owns its flags, request schema, and handler
+- `src/commands.ts` — shared registry for commands sent over the socket
+- `src/command.ts` — validates requests and tracks activity for targeted commands
 - `src/log.ts` — structured JSON logging with `severity` field: `log.info()`, `log.warn()`, `log.error()`
 
 ## Flow
 
 1. CLI parses flags into `{ action, ...params }`, including either `session` or `port` for browser commands
 2. Sends JSON to daemon over Unix socket
-3. Daemon looks up owned browsers by session ID or attaches to external Chrome by port
-4. Daemon calls command function, returns result
+3. Daemon dispatches to the registered command, which validates its input
+4. Browser commands look up a session when they need one
 5. CLI prints result
 
 ## Development

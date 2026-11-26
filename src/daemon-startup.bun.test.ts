@@ -112,6 +112,25 @@ test.skipIf(process.platform !== "linux")(
 );
 
 test.skipIf(process.platform !== "linux")(
+  "navigate requires a numeric timeout before resolving its session",
+  async () => {
+    await cli("daemon-start");
+    const result = send({
+      action: "navigate",
+      session: "missing",
+      timeout: "5000",
+      url: "about:blank",
+    });
+    const [outcome] = await Promise.allSettled([result]);
+    expect(outcome).toEqual({
+      reason: new Error("param 'timeout' must be a number"),
+      status: "rejected",
+    });
+  },
+  20_000,
+);
+
+test.skipIf(process.platform !== "linux")(
   "parallel cold start produces one daemon and one reachable socket",
   async () => {
     const starts = Array.from({ length: 8 }, () => cli("daemon-start"));

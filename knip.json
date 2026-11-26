@@ -2,6 +2,7 @@
   "entry": [
     "cli.ts!",
     "src/daemon.ts!",
+    "src/browser.ts!",
     "bench.ts",
     ".oxlint/**/*.test.ts",
     "scripts/*.ts!",

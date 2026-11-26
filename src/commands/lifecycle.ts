@@ -1,3 +1,13 @@
+import { z } from "zod";
+import {
+  defineDaemonCommand,
+  defineTargetCommand,
+  noParams,
+  opt,
+  toggle,
+  type CommandEntry,
+} from "../command.ts";
+
 import {
   launch as launchChrome,
   connect,
@@ -180,13 +190,13 @@ export const reapIdleCmd = async (state: DaemonState): Promise<string> => {
   return JSON.stringify({ reaped });
 };
 
-export const statusCmd = (state: DaemonState): string => {
+const statusCmd = (state: DaemonState): string => {
   const sessions = [...state.sessions.values()];
   const targets = sessions.map(({ target }) => targetFields(target));
   return JSON.stringify({ sessions: targets.length, targets });
 };
 
-export const shutdownCmd = async (state: DaemonState): Promise<string> => {
+const shutdownCmd = async (state: DaemonState): Promise<string> => {
   await killAllCmd(state);
   setTimeout(() => process.exit(0), 100);
   return JSON.stringify({ shutdown: true });
@@ -200,8 +210,38 @@ const shutdownOnSignal = (state: DaemonState) => (signal: NodeJS.Signals) => {
   });
 };
 
+export const lifecycleHandlers: readonly CommandEntry[] = [
+  ["kill-all", ({ state }) => killAllCmd(state)],
+  ["status", ({ state }) => statusCmd(state)],
+  ["shutdown", ({ state }) => shutdownCmd(state)],
+];
+
 export const shutdownOnSignals = (state: DaemonState): void => {
   const handler = shutdownOnSignal(state);
   process.once("SIGTERM", handler);
   process.once("SIGINT", handler);
 };
+
+const LaunchParams = z.object({ headless: toggle }).readonly();
+
+export const launchCommand = defineDaemonCommand(
+  {
+    description: "Launch a new Chrome instance",
+    flags: [opt("--headed", "launch with visible window")],
+    name: "launch",
+    toPayload: (o) => ({ headless: !o["headed"] }),
+  },
+  LaunchParams,
+  ({ state }, { headless }) => launchCmd(state, headless),
+);
+
+export const killCommand = defineTargetCommand(
+  {
+    description: "Kill a Chrome instance by session or port",
+    flags: [],
+    name: "kill",
+    toPayload: () => ({}),
+  },
+  noParams,
+  ({ state }, target) => killCmd(state, target),
+);

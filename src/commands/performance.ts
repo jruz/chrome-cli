@@ -1,3 +1,14 @@
+import { z } from "zod";
+import {
+  defineDaemonCommand,
+  definePageCommand,
+  defineTargetCommand,
+  opt,
+  req,
+  textParam,
+  toggle,
+} from "../command.ts";
+import { targetKey } from "../target.ts";
 import type { Page, CDPSession } from "puppeteer-core";
 
 const TRACE_CATEGORIES = [
@@ -44,7 +55,7 @@ const collectTrace = async (
   return JSON.stringify({ size: traceData.length });
 };
 
-export const startTrace = async (
+const startTrace = async (
   page: Page,
   filePath: string | undefined,
   doReload: boolean,
@@ -74,7 +85,7 @@ export const startTrace = async (
   };
 };
 
-export const stopTrace = async (
+const stopTrace = async (
   capture: TraceCapture,
   filePath: string | undefined,
 ): Promise<string> => collectTrace(capture.cdpSession, filePath);
@@ -330,7 +341,7 @@ const INSIGHT_EXTRACTORS: Record<
   RenderBlocking: extractRenderBlocking,
 };
 
-export const analyzeTrace = async (filePath: string): Promise<string> => {
+const analyzeTrace = async (filePath: string): Promise<string> => {
   const events = await parseTraceEvents(filePath);
   const sets = groupByNavigation(events);
 
@@ -347,7 +358,7 @@ export const analyzeTrace = async (filePath: string): Promise<string> => {
   return JSON.stringify({ ...cwv, insightSets });
 };
 
-export const analyzeInsight = async (
+const analyzeInsight = async (
   filePath: string,
   insightSetId: string,
   insightName: string,
@@ -375,7 +386,7 @@ export const analyzeInsight = async (
   });
 };
 
-export const takeHeapSnapshot = async (
+const takeHeapSnapshot = async (
   page: Page,
   filePath: string,
 ): Promise<string> => {
@@ -399,3 +410,117 @@ export const takeHeapSnapshot = async (
 
   return JSON.stringify({ saved: filePath });
 };
+
+const TraceStartParams = z
+  .object({
+    autoStop: toggle,
+    path: textParam("path").optional(),
+    reload: toggle,
+  })
+  .readonly();
+
+export const traceStartCommand = defineTargetCommand(
+  {
+    description: "Start a performance trace",
+    flags: [
+      opt("--path <path>", "save trace to file"),
+      opt("--reload", "reload page after starting trace"),
+      opt("--auto-stop", "stop trace after page loads"),
+    ],
+    name: "trace-start",
+    toPayload: (o) => ({
+      autoStop: !!o["autoStop"],
+      path: o["path"],
+      reload: !!o["reload"],
+    }),
+  },
+  TraceStartParams,
+  async ({ getSession, traceCaptures }, target, { autoStop, path, reload }) => {
+    const key = targetKey(target);
+    if (traceCaptures.has(key))
+      throw new Error(`trace already active on ${key}`);
+    const { page } = await getSession(target);
+    const { capture, result } = await startTrace(page, path, reload, autoStop);
+    if (!autoStop) traceCaptures.set(key, capture);
+    return result;
+  },
+);
+
+const TraceStopParams = z
+  .object({ path: textParam("path").optional() })
+  .readonly();
+
+export const traceStopCommand = defineTargetCommand(
+  {
+    description: "Stop the performance trace",
+    flags: [opt("--path <path>", "save trace to file")],
+    name: "trace-stop",
+    toPayload: (o) => ({ path: o["path"] }),
+  },
+  TraceStopParams,
+  async ({ traceCaptures }, target, { path }) => {
+    const key = targetKey(target);
+    const capture = traceCaptures.get(key);
+    if (!capture) throw new Error(`no active trace on ${key}`);
+    const result = await stopTrace(capture, path);
+    traceCaptures.delete(key);
+    return result;
+  },
+);
+
+const TraceAnalyzeParams = z.object({ path: textParam("path") }).readonly();
+
+export const traceAnalyzeCommand = defineDaemonCommand(
+  {
+    description: "Analyze a trace file for performance insights",
+    flags: [req("--path <path>", "trace file to analyze")],
+    name: "trace-analyze",
+    toPayload: (o) => ({ path: o["path"] }),
+  },
+  TraceAnalyzeParams,
+  (_, { path }) => analyzeTrace(path),
+);
+
+const TraceAnalyzeInsightParams = z
+  .object({
+    insightName: textParam("insightName"),
+    insightSetId: textParam("insightSetId"),
+    path: textParam("path"),
+  })
+  .readonly();
+
+export const traceAnalyzeInsightCommand = defineDaemonCommand(
+  {
+    description: "Get detailed info on a specific performance insight",
+    flags: [
+      req("--path <path>", "trace file to analyze"),
+      req("--insight-set-id <id>", "insight set ID from trace-analyze output"),
+      req(
+        "--insight-name <name>",
+        "insight name (DocumentLatency, LCPBreakdown, RenderBlocking, CLSCulprits, LongTasks)",
+      ),
+    ],
+    name: "trace-analyze-insight",
+    toPayload: (o) => ({
+      insightName: o["insightName"],
+      insightSetId: o["insightSetId"],
+      path: o["path"],
+    }),
+  },
+  TraceAnalyzeInsightParams,
+  (_, { path, insightSetId, insightName }) =>
+    analyzeInsight(path, insightSetId, insightName),
+);
+
+const HeapSnapshotParams = z.object({ path: textParam("path") }).readonly();
+
+export const heapSnapshotCommand = definePageCommand(
+  {
+    description: "Capture a heap memory snapshot",
+    flags: [req("--path <path>", "save .heapsnapshot to file")],
+    name: "heap-snapshot",
+    toPayload: (o) => ({ path: o["path"] }),
+  },
+  HeapSnapshotParams,
+  (page, { path }) => takeHeapSnapshot(page, path),
+);

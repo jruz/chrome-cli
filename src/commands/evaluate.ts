@@ -1,3 +1,12 @@
+import { z } from "zod";
+import {
+  arrayParam,
+  definePageCommand,
+  opt,
+  req,
+  textParam,
+} from "../command.ts";
+
 import type { Page } from "puppeteer-core";
 import { findByUid } from "./interact";
 
@@ -47,3 +56,34 @@ export const evaluate = async (
   const result = await page.evaluate(script);
   return JSON.stringify({ result });
 };
+
+const EvalParams = z
+  .object({
+    args: arrayParam("args").optional(),
+    expression: textParam("expression"),
+  })
+  .readonly();
+
+export const evalCommand = definePageCommand(
+  {
+    description: "Evaluate JavaScript in page context",
+    flags: [
+      req("--expression <code>", "JavaScript expression"),
+      opt("--args <json>", "JSON array of {uid} element references"),
+    ],
+    name: "eval",
+    toPayload: (o) => {
+      const argsRaw = o["args"];
+      if (!argsRaw) return { expression: o["expression"] };
+      try {
+        return { args: JSON.parse(argsRaw), expression: o["expression"] };
+      } catch (err) {
+        throw new Error(`invalid JSON for --args: ${String(err)}`, {
+          cause: err,
+        });
+      }
+    },
+  },
+  EvalParams,
+  (page, { expression, args }) => evaluate(page, expression, args),
+);

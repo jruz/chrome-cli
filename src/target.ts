@@ -9,7 +9,7 @@ export type TargetFields =
   | { readonly session: string }
   | { readonly port: number };
 
-export const sessionTarget = (id: string): Target => ({ id, kind: "session" });
+const sessionTarget = (id: string): Target => ({ id, kind: "session" });
 
 export const portTarget = (port: number): Target => ({ kind: "port", port });
 
