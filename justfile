@@ -2,6 +2,8 @@ mod ts '.just/ts.justfile'
 mod bun '.just/bun.justfile'
 mod tools '.just/tools.just'
 
+export REVISION := env("REVISION", shell("git rev-parse --short HEAD"))
+
 setup:
     just ts::install
 
@@ -81,9 +83,6 @@ deps-install:
 
 release-build OS ARCH:
     #!/usr/bin/env nu
-    if ($env.REVISION? | is-empty) {
-        error make {msg: "ERROR: REVISION is not set"}
-    }
     let name = (open package.json | get name)
     let target = "bun-{{ OS }}-{{ ARCH }}"
     let outfile = $"dist/($name)-{{ OS }}-{{ ARCH }}"
