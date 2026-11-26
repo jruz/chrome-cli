@@ -4,7 +4,7 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 ## Why this over Chrome MCP?
 
-- **Parallel by design** — each Chrome instance gets its own port, so multiple Claude Code agents can browse simultaneously without conflicts
+- **Parallel by design** — each launched Chrome instance gets its own session ID, so multiple Claude Code agents can browse simultaneously without conflicts
 - **No context pollution** — browser state stays in the daemon, outside the model’s context window
 - **No MCP setup** — run the CLI directly from your shell
 - **Fast** — Unix socket daemon stays warm between calls, no per-request startup cost
@@ -31,34 +31,39 @@ Download from [Codeberg releases](https://codeberg.org/jruz/chrome-cli/releases)
 ## Usage
 
 ```bash
-# launch a headless Chrome instance
-chrome-cli launch
+# launch a headless Chrome instance (requires jq for this example)
+session=$(chrome-cli launch | jq -r .session)
 
 # navigate to a URL
-chrome-cli navigate --port 9222 --url https://example.com --timeout 10000
+chrome-cli navigate --session "$session" --url https://example.com --timeout 10000
 
 # take an accessibility snapshot
-chrome-cli snapshot --port 9222
+chrome-cli snapshot --session "$session"
 
 # take a screenshot
-chrome-cli screenshot --port 9222 --format png --path screenshot.png
+chrome-cli screenshot --session "$session" --format png --path screenshot.png
 
 # interact with elements (by uid from snapshot)
-chrome-cli click --port 9222 --uid 5
-chrome-cli fill --port 9222 --uid 3 --value "hello"
-chrome-cli type --port 9222 --text "search query" --submit-key Enter
+chrome-cli click --session "$session" --uid 5
+chrome-cli fill --session "$session" --uid 3 --value "hello"
+chrome-cli type --session "$session" --text "search query" --submit-key Enter
 
 # evaluate JavaScript
-chrome-cli eval --port 9222 --expression "document.title"
+chrome-cli eval --session "$session" --expression "document.title"
 
 # manage pages
-chrome-cli pages --port 9222
-chrome-cli new-page --port 9222 --url https://example.com
-chrome-cli close-page --port 9222 --page-id <id>
+chrome-cli pages --session "$session"
+chrome-cli new-page --session "$session" --url https://example.com
+chrome-cli close-page --session "$session" --page-id <id>
 
 # kill the instance
-chrome-cli kill --port 9222
+chrome-cli kill --session "$session"
 ```
+
+`launch` returns `{ "session": "<id>" }`. Pass that ID with `--session`.
+
+To control a Chrome you started with a local remote-debugging port, use `--port <port>` instead.
+Browser commands require exactly one of these flags.
 
 ### Stop Chrome sessions
 
@@ -83,13 +88,15 @@ A daemon left on the old socket can be stopped with `chrome-cli kill-all --inclu
 CLI → Unix socket → Daemon → CDP → Chrome
 ```
 
-Multiple CLI invocations can control different Chrome instances in parallel by using different `--port` values.
+The daemon uses a private CDP pipe for each browser it launches. These browsers do not expose a debugging port.
 
 The daemon owns at most 8 browsers, counting `launch` and `oneshot` launches in progress.
 A launch over the limit fails until `kill` or `kill-all` closes a browser.
 
 The daemon closes browsers it launched after 30 minutes without a command, unless a command is still running.
 `SIGTERM` and `SIGINT` close tracked browsers before the daemon exits.
+
+If the daemon is killed with `SIGKILL`, Chrome exits when the pipe closes. The temporary profile can remain on disk.
 
 ## Claude Code skill
 

@@ -66,6 +66,13 @@ import {
   SOCKET_PATH,
 } from "./config";
 import { createCapacity } from "./capacity";
+import {
+  parseTarget,
+  sessionTarget,
+  targetFields,
+  targetKey,
+  type Target,
+} from "./target";
 import { acquireDaemonLock } from "./daemon-lock";
 import { rmSync } from "node:fs";
 import { z, ZodError } from "zod";
@@ -147,10 +154,10 @@ const isGeo = (v: unknown): v is Geo =>
   "longitude" in v &&
   typeof v.longitude === "number";
 
-const sessions = new Map<number, Session>();
-const networkCaptures = new Map<number, NetworkCapture>();
-const consoleCaptures = new Map<number, ConsoleCapture>();
-const traceCaptures = new Map<number, TraceCapture>();
+const sessions = new Map<string, Session>();
+const networkCaptures = new Map<string, NetworkCapture>();
+const consoleCaptures = new Map<string, ConsoleCapture>();
+const traceCaptures = new Map<string, TraceCapture>();
 const state: DaemonState = {
   activity: createActivity(IDLE_TIMEOUT_MS),
   capacity: createCapacity(MAX_BROWSERS),
@@ -159,7 +166,8 @@ const state: DaemonState = {
   sessions,
 };
 
-const getSession = (port: number): Promise<Session> => sessionFor(state, port);
+const getSession = (target: Target): Promise<Session> =>
+  sessionFor(state, target);
 
 const commands = new Map<string, CommandDef>([
   [
@@ -177,8 +185,8 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: (p) => {
-        const port = num(p, "port");
-        return killCmd(state, port);
+        const target = parseTarget(p);
+        return killCmd(state, target);
       },
     },
   ],
@@ -381,8 +389,8 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const session = await getSession(target);
         const bg = bool(p, "background");
         const url = str(p, "url");
         const isolatedContext = optStr(p, "isolatedContext");
@@ -405,8 +413,8 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const session = await getSession(target);
         const pageId = num(p, "pageId");
         const result = await closePage(session.browser, pageId);
         const pages = await session.browser.pages();
@@ -422,8 +430,8 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const session = await getSession(target);
         const btf = p["noBringToFront"] ? false : true;
         const pageId = num(p, "pageId");
         const page = await selectPage(session.browser, pageId, btf);
@@ -512,10 +520,11 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        if (traceCaptures.has(port))
-          throw new Error(`trace already active on port ${port}`);
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        if (traceCaptures.has(key))
+          throw new Error(`trace already active on ${key}`);
+        const session = await getSession(target);
         const path = optStr(p, "path");
         const doReload = bool(p, "reload");
         const autoStop = bool(p, "autoStop");
@@ -525,7 +534,7 @@ const commands = new Map<string, CommandDef>([
           doReload,
           autoStop,
         );
-        if (!autoStop) traceCaptures.set(port, capture);
+        if (!autoStop) traceCaptures.set(key, capture);
         return result;
       },
     },
@@ -535,12 +544,13 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const capture = traceCaptures.get(port);
-        if (!capture) throw new Error(`no active trace on port ${port}`);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = traceCaptures.get(key);
+        if (!capture) throw new Error(`no active trace on ${key}`);
         const path = optStr(p, "path");
         const result = await stopTrace(capture, path);
-        traceCaptures.delete(port);
+        traceCaptures.delete(key);
         return result;
       },
     },
@@ -583,13 +593,14 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        if (networkCaptures.has(port))
-          throw new Error(`network capture already active on port ${port}`);
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        if (networkCaptures.has(key))
+          throw new Error(`network capture already active on ${key}`);
+        const session = await getSession(target);
         const capture = await startNetworkCapture(session.page);
-        networkCaptures.set(port, capture);
-        return JSON.stringify({ capturing: true, port });
+        networkCaptures.set(key, capture);
+        return JSON.stringify({ capturing: true, ...targetFields(target) });
       },
     },
   ],
@@ -598,10 +609,10 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: (p) => {
-        const port = num(p, "port");
-        const capture = networkCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active network capture on port ${port}`);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = networkCaptures.get(key);
+        if (!capture) throw new Error(`no active network capture on ${key}`);
         const type = optStr(p, "type");
         const includePreserved = bool(p, "includePreserved");
         const pageIdx = optNum(p, "pageIdx");
@@ -621,10 +632,10 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const capture = networkCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active network capture on port ${port}`);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = networkCaptures.get(key);
+        if (!capture) throw new Error(`no active network capture on ${key}`);
         const reqid = num(p, "reqid");
         const requestFile = optStr(p, "requestFile");
         const responseFile = optStr(p, "responseFile");
@@ -637,13 +648,13 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const capture = networkCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active network capture on port ${port}`);
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = networkCaptures.get(key);
+        if (!capture) throw new Error(`no active network capture on ${key}`);
+        const session = await getSession(target);
         const result = await stopNetworkCapture(session.page, capture);
-        networkCaptures.delete(port);
+        networkCaptures.delete(key);
         return result;
       },
     },
@@ -654,13 +665,14 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        if (consoleCaptures.has(port))
-          throw new Error(`console capture already active on port ${port}`);
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        if (consoleCaptures.has(key))
+          throw new Error(`console capture already active on ${key}`);
+        const session = await getSession(target);
         const capture = startConsoleCapture(session.page);
-        consoleCaptures.set(port, capture);
-        return JSON.stringify({ capturing: true, port });
+        consoleCaptures.set(key, capture);
+        return JSON.stringify({ capturing: true, ...targetFields(target) });
       },
     },
   ],
@@ -669,10 +681,10 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: (p) => {
-        const port = num(p, "port");
-        const capture = consoleCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active console capture on port ${port}`);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = consoleCaptures.get(key);
+        if (!capture) throw new Error(`no active console capture on ${key}`);
         const type = optStr(p, "type");
         const includePreserved = bool(p, "includePreserved");
         const pageIdx = optNum(p, "pageIdx");
@@ -692,10 +704,10 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: (p) => {
-        const port = num(p, "port");
-        const capture = consoleCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active console capture on port ${port}`);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = consoleCaptures.get(key);
+        if (!capture) throw new Error(`no active console capture on ${key}`);
         const msgid = num(p, "msgid");
         return getConsoleEntry(capture.entries, msgid);
       },
@@ -706,13 +718,13 @@ const commands = new Map<string, CommandDef>([
     {
       needs: "daemon",
       run: async (p) => {
-        const port = num(p, "port");
-        const capture = consoleCaptures.get(port);
-        if (!capture)
-          throw new Error(`no active console capture on port ${port}`);
-        const session = await getSession(port);
+        const target = parseTarget(p);
+        const key = targetKey(target);
+        const capture = consoleCaptures.get(key);
+        if (!capture) throw new Error(`no active console capture on ${key}`);
+        const session = await getSession(target);
         const result = stopConsoleCapture(session.page, capture);
-        consoleCaptures.delete(port);
+        consoleCaptures.delete(key);
         return result;
       },
     },
@@ -749,8 +761,8 @@ const dispatch = async (params: Params): Promise<string> => {
 
   switch (def.needs) {
     case "page": {
-      const port = num(params, "port");
-      const { page } = await getSession(port);
+      const target = parseTarget(params);
+      const { page } = await getSession(target);
       const result = await def.run(page, params);
       if (bool(params, "includeSnapshot") && SNAPSHOT_ACTIONS.has(action)) {
         const snap = await snapshot(page, false, undefined);
@@ -759,8 +771,8 @@ const dispatch = async (params: Params): Promise<string> => {
       return result;
     }
     case "browser": {
-      const browserPort = num(params, "port");
-      const { browser } = await getSession(browserPort);
+      const target = parseTarget(params);
+      const { browser } = await getSession(target);
       return def.run(browser, params);
     }
     case "daemon": {
@@ -769,11 +781,18 @@ const dispatch = async (params: Params): Promise<string> => {
   }
 };
 
+const ownedKey = (params: Params): string | undefined => {
+  const session = params["session"];
+  if (typeof session !== "string") return undefined;
+  const target = sessionTarget(session);
+  const key = targetKey(target);
+  return state.capacity.owned.has(key) ? key : undefined;
+};
+
 const execute = (params: Params): Promise<string> => {
-  const port = params["port"];
-  if (typeof port !== "number" || !state.capacity.owned.has(port))
-    return dispatch(params);
-  return track(state.activity, port, () => dispatch(params));
+  const key = ownedKey(params);
+  if (key === undefined) return dispatch(params);
+  return track(state.activity, key, () => dispatch(params));
 };
 
 const reapIdle = (): void => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export type Capacity = {
   readonly limit: number;
-  readonly owned: Set<number>;
+  readonly owned: Set<string>;
   launching: number;
 };
 
@@ -18,20 +18,20 @@ export const reserve = (capacity: Capacity): void => {
   const used = capacity.launching + capacity.owned.size;
   if (used >= capacity.limit)
     throw new Error(
-      `browser limit reached (${used}/${capacity.limit}); close one with chrome-cli kill --port <port>`,
+      `browser limit reached (${used}/${capacity.limit}); close one with chrome-cli kill --session <id>`,
     );
   capacity.launching += 1;
 };
 
-export const confirm = (capacity: Capacity, port: number): void => {
+export const confirm = (capacity: Capacity, key: string): void => {
   capacity.launching -= 1;
-  capacity.owned.add(port);
+  capacity.owned.add(key);
 };
 
 export const cancel = (capacity: Capacity): void => {
   capacity.launching -= 1;
 };
 
-export const release = (capacity: Capacity, port: number): void => {
-  capacity.owned.delete(port);
+export const release = (capacity: Capacity, key: string): void => {
+  capacity.owned.delete(key);
 };

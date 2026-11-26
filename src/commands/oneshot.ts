@@ -3,6 +3,7 @@ import { screenshot } from "./snapshot";
 import type { DaemonState } from "./lifecycle";
 import { killCmd, launchSession } from "./lifecycle";
 import { track } from "../activity";
+import { targetKey } from "../target";
 
 type OneshotMode = "snapshot" | "screenshot";
 
@@ -39,7 +40,7 @@ export const oneshot = async (
       : false;
 
   const session = await launchSession(state, true);
-  const { page, port } = session;
+  const { page, target } = session;
 
   const capture = async (): Promise<string> => {
     await page.setViewport({ height, width });
@@ -57,8 +58,9 @@ export const oneshot = async (
   };
 
   try {
-    return await track(state.activity, port, capture);
+    const key = targetKey(target);
+    return await track(state.activity, key, capture);
   } finally {
-    await killCmd(state, port);
+    await killCmd(state, target);
   }
 };

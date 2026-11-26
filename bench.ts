@@ -1,5 +1,7 @@
 import { log } from "./src/log";
-import { connect } from "./src/browser";
+import { rm } from "node:fs/promises";
+import { z } from "zod";
+import { closeOwned, launch, type Session } from "./src/browser.ts";
 import { ensureDaemon, send } from "./src/client";
 import { navigate } from "./src/commands/navigate";
 import { snapshot } from "./src/commands/snapshot";
@@ -63,82 +65,85 @@ const runCli = async (args: string): Promise<number[]> => {
       stderr: "pipe",
       stdout: "pipe",
     });
-    await proc.exited;
+    const [code, , stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    if (code !== 0) throw new Error(`bench ${args}: ${stderr}`);
     times.push(performance.now() - start);
   }
   return times;
 };
 
-const main = async () => {
-  await ensureDaemon();
-  const portStr = await send({ action: "launch", headless: true });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(portStr);
-  } catch (err) {
-    log.error(`failed to parse launch response: ${portStr} (${String(err)})`);
-    process.exit(1);
-  }
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("port" in parsed) ||
-    typeof parsed.port !== "number"
-  ) {
-    log.error(`unexpected launch response: ${portStr}`);
-    process.exit(1);
-  }
-  const port = parsed.port;
-
-  await send({ action: "navigate", port, timeout: 30000, url: TARGET_URL });
+const measureDaemon = async (id: string): Promise<BenchResult[]> => {
+  await send({
+    action: "navigate",
+    session: id,
+    timeout: 30000,
+    url: TARGET_URL,
+  });
 
   const results: BenchResult[] = [];
 
   const cliNav = await runCli(
-    `navigate --port ${port} --url ${TARGET_URL} --timeout 30000`,
+    `navigate --session ${id} --url ${TARGET_URL} --timeout 30000`,
   );
   const cliNavStats = stats("navigate", "cli", cliNav);
   results.push(cliNavStats);
-  const cliSnap = await runCli(`snapshot --port ${port}`);
+  const cliSnap = await runCli(`snapshot --session ${id}`);
   const cliSnapStats = stats("snapshot", "cli", cliSnap);
   results.push(cliSnapStats);
   const cliShot = await runCli(
-    `screenshot --port ${port} --path /tmp/bench-shot.png`,
+    `screenshot --session ${id} --format png --path /tmp/bench-shot.png`,
   );
   const cliShotStats = stats("screenshot", "cli", cliShot);
   results.push(cliShotStats);
   const cliEval = await runCli(
-    `eval --port ${port} --expression document.title`,
+    `eval --session ${id} --expression document.title`,
   );
   const cliEvalStats = stats("eval", "cli", cliEval);
   results.push(cliEvalStats);
-  const cliPages = await runCli(`pages --port ${port}`);
+  const cliPages = await runCli(`pages --session ${id}`);
   const cliPagesStats = stats("pages", "cli", cliPages);
   results.push(cliPagesStats);
 
   const daemonNav = await timeOp(() =>
-    send({ action: "navigate", port, timeout: 30000, url: TARGET_URL }),
+    send({ action: "navigate", session: id, timeout: 30000, url: TARGET_URL }),
   );
   const daemonNavStats = stats("navigate", "daemon", daemonNav);
   results.push(daemonNavStats);
-  const daemonSnap = await timeOp(() => send({ action: "snapshot", port }));
+  const daemonSnap = await timeOp(() =>
+    send({ action: "snapshot", session: id }),
+  );
   const daemonSnapStats = stats("snapshot", "daemon", daemonSnap);
   results.push(daemonSnapStats);
   const daemonShot = await timeOp(() =>
-    send({ action: "screenshot", path: "/tmp/bench-shot-d.png", port }),
+    send({
+      action: "screenshot",
+      format: "png",
+      path: "/tmp/bench-shot-d.png",
+      session: id,
+    }),
   );
   const daemonShotStats = stats("screenshot", "daemon", daemonShot);
   results.push(daemonShotStats);
   const daemonEval = await timeOp(() =>
-    send({ action: "eval", expression: "document.title", port }),
+    send({ action: "eval", expression: "document.title", session: id }),
   );
   const daemonEvalStats = stats("eval", "daemon", daemonEval);
   results.push(daemonEvalStats);
-  const daemonPages = await timeOp(() => send({ action: "pages", port }));
+  const daemonPages = await timeOp(() =>
+    send({ action: "pages", session: id }),
+  );
   const daemonPagesStats = stats("pages", "daemon", daemonPages);
   results.push(daemonPagesStats);
 
-  const session = await connect(port, "");
+  return results;
+};
+
+const measureRaw = async (session: Session): Promise<BenchResult[]> => {
+  const results: BenchResult[] = [];
 
   const rawNav = await timeOp(() =>
     navigate(session.page, TARGET_URL, 30000, undefined, undefined),
@@ -177,8 +182,10 @@ const main = async () => {
   const rawPagesStats = stats("pages", "raw-cdp", rawPages);
   results.push(rawPagesStats);
 
-  await session.browser.disconnect();
+  return results;
+};
 
+const printResults = (results: readonly BenchResult[]) => {
   const pad = (s: string, n: number) => s.padEnd(n);
   const rpad = (s: string, n: number) => s.padStart(n);
 
@@ -208,9 +215,31 @@ const main = async () => {
   ].join("\n");
 
   log.info(output);
-
-  const proc = Bun.spawn(["pkill", "-f", `remote-debugging-port=${port}`]);
-  await proc.exited;
 };
 
-await main();
+const benchDaemon = async (): Promise<BenchResult[]> => {
+  await ensureDaemon();
+  const response = await send({ action: "launch", headless: true });
+  const launchResult = z.object({ session: z.string() });
+  const raw: unknown = await new Response(response).json();
+  const { session } = launchResult.parse(raw);
+  try {
+    return await measureDaemon(session);
+  } finally {
+    await send({ action: "kill", session });
+  }
+};
+
+const benchRaw = async (): Promise<BenchResult[]> => {
+  const browser = await launch(true);
+  try {
+    return await measureRaw(browser);
+  } finally {
+    await closeOwned(browser.browser);
+    await rm(browser.userDataDir, { recursive: true });
+  }
+};
+
+const daemonResults = await benchDaemon();
+const rawResults = await benchRaw();
+printResults([...daemonResults, ...rawResults]);

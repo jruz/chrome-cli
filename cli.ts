@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { log } from "./src/log";
 import {
   ensureDaemon,
@@ -18,7 +18,7 @@ type Flag = {
 type CliCommand = {
   name: string;
   description: string;
-  needsPort: boolean;
+  needsTarget: boolean;
   flags: Flag[];
   toPayload: (opts: Record<string, string>) => Record<string, unknown>;
 };
@@ -49,14 +49,14 @@ const cliCommands: CliCommand[] = [
     description: "Launch a new Chrome instance",
     flags: [opt("--headed", "launch with visible window")],
     name: "launch",
-    needsPort: false,
+    needsTarget: false,
     toPayload: (o) => ({ headless: !o["headed"] }),
   },
   {
-    description: "Kill a Chrome instance by port",
+    description: "Kill a Chrome instance by session or port",
     flags: [],
     name: "kill",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
@@ -74,7 +74,7 @@ const cliCommands: CliCommand[] = [
       opt("--height <px>", "viewport height (default: 768)"),
     ],
     name: "oneshot",
-    needsPort: false,
+    needsTarget: false,
     toPayload: (o) => ({
       format: o["format"],
       fullPage: !!o["fullPage"],
@@ -100,7 +100,7 @@ const cliCommands: CliCommand[] = [
       ),
     ],
     name: "navigate",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       handleBeforeUnload: o["handleBeforeUnload"],
       initScript: o["initScript"],
@@ -112,21 +112,21 @@ const cliCommands: CliCommand[] = [
     description: "Navigate back in browser history",
     flags: [],
     name: "back",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
     description: "Navigate forward in browser history",
     flags: [],
     name: "forward",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
     description: "Reload the current page",
     flags: [opt("--ignore-cache", "bypass cache on reload")],
     name: "reload",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ ignoreCache: !!o["ignoreCache"] }),
   },
   {
@@ -136,7 +136,7 @@ const cliCommands: CliCommand[] = [
       opt("--path <path>", "save to file"),
     ],
     name: "snapshot",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ filePath: o["path"], verbose: !!o["verbose"] }),
   },
   {
@@ -149,7 +149,7 @@ const cliCommands: CliCommand[] = [
       opt("--uid <uid>", "capture a single element"),
     ],
     name: "screenshot",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       format: o["format"],
       fullPage: !!o["fullPage"],
@@ -166,7 +166,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "click",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       dblClick: !!o["dblClick"],
       includeSnapshot: !!o["includeSnapshot"],
@@ -180,7 +180,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "hover",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includeSnapshot: !!o["includeSnapshot"],
       uid: o["uid"],
@@ -194,7 +194,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "fill",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includeSnapshot: !!o["includeSnapshot"],
       uid: o["uid"],
@@ -209,7 +209,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "type",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includeSnapshot: !!o["includeSnapshot"],
       submitKey: o["submitKey"],
@@ -223,7 +223,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "press",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includeSnapshot: !!o["includeSnapshot"],
       key: o["key"],
@@ -237,7 +237,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "drag",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       from: o["from"],
       includeSnapshot: !!o["includeSnapshot"],
@@ -252,7 +252,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "upload",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       file: o["file"],
       includeSnapshot: !!o["includeSnapshot"],
@@ -266,7 +266,7 @@ const cliCommands: CliCommand[] = [
       opt("--include-snapshot", "include snapshot in response"),
     ],
     name: "fill-form",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => {
       const raw = o["fields"];
       if (!raw) throw new Error("--fields is required");
@@ -289,7 +289,7 @@ const cliCommands: CliCommand[] = [
       req("--height <px>", "viewport height"),
     ],
     name: "resize",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       height: Number(o["height"]),
       width: Number(o["width"]),
@@ -302,7 +302,7 @@ const cliCommands: CliCommand[] = [
       opt("--args <json>", "JSON array of {uid} element references"),
     ],
     name: "eval",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => {
       const argsRaw = o["args"];
       if (!argsRaw) return { expression: o["expression"] };
@@ -319,7 +319,7 @@ const cliCommands: CliCommand[] = [
     description: "List all open pages/tabs",
     flags: [],
     name: "pages",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
@@ -334,7 +334,7 @@ const cliCommands: CliCommand[] = [
       opt("--timeout <ms>", "navigation timeout"),
     ],
     name: "new-page",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       background: !!o["background"],
       isolatedContext: o["isolatedContext"],
@@ -346,7 +346,7 @@ const cliCommands: CliCommand[] = [
     description: "Close a page/tab by index",
     flags: [req("--page-id <id>", "page index")],
     name: "close-page",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ pageId: Number(o["pageId"]) }),
   },
   {
@@ -356,7 +356,7 @@ const cliCommands: CliCommand[] = [
       opt("--no-bring-to-front", "select without focusing"),
     ],
     name: "select-page",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       noBringToFront: !!o["noBringToFront"],
       pageId: Number(o["pageId"]),
@@ -380,7 +380,7 @@ const cliCommands: CliCommand[] = [
       ),
     ],
     name: "emulate",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => {
       const resolveViewport = () => {
         if (!o["viewport"]) return undefined;
@@ -422,7 +422,7 @@ const cliCommands: CliCommand[] = [
       req("--timeout <ms>", "max wait time"),
     ],
     name: "wait",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => {
       const text = o["text"];
       if (!text) throw new Error("--text is required");
@@ -436,7 +436,7 @@ const cliCommands: CliCommand[] = [
       opt("--prompt-text <text>", "prompt input"),
     ],
     name: "dialog",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       dialogAction: o["action"],
       promptText: o["promptText"],
@@ -450,7 +450,7 @@ const cliCommands: CliCommand[] = [
       opt("--auto-stop", "stop trace after page loads"),
     ],
     name: "trace-start",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       autoStop: !!o["autoStop"],
       path: o["path"],
@@ -461,14 +461,14 @@ const cliCommands: CliCommand[] = [
     description: "Stop the performance trace",
     flags: [opt("--path <path>", "save trace to file")],
     name: "trace-stop",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ path: o["path"] }),
   },
   {
     description: "Analyze a trace file for performance insights",
     flags: [req("--path <path>", "trace file to analyze")],
     name: "trace-analyze",
-    needsPort: false,
+    needsTarget: false,
     toPayload: (o) => ({ path: o["path"] }),
   },
   {
@@ -482,7 +482,7 @@ const cliCommands: CliCommand[] = [
       ),
     ],
     name: "trace-analyze-insight",
-    needsPort: false,
+    needsTarget: false,
     toPayload: (o) => ({
       insightName: o["insightName"],
       insightSetId: o["insightSetId"],
@@ -493,14 +493,14 @@ const cliCommands: CliCommand[] = [
     description: "Capture a heap memory snapshot",
     flags: [req("--path <path>", "save .heapsnapshot to file")],
     name: "heap-snapshot",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ path: o["path"] }),
   },
   {
     description: "Start capturing network requests",
     flags: [],
     name: "network-start",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
@@ -512,7 +512,7 @@ const cliCommands: CliCommand[] = [
       opt("--page-idx <n>", "page number (0-based)"),
     ],
     name: "network-list",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includePreserved: !!o["includePreserved"],
       pageIdx: o["pageIdx"] ? Number(o["pageIdx"]) : undefined,
@@ -528,7 +528,7 @@ const cliCommands: CliCommand[] = [
       opt("--response-file <path>", "save response body to file"),
     ],
     name: "network-get",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       reqid: Number(o["reqid"]),
       requestFile: o["requestFile"],
@@ -539,14 +539,14 @@ const cliCommands: CliCommand[] = [
     description: "Stop capturing network requests",
     flags: [],
     name: "network-stop",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
     description: "Start capturing console messages",
     flags: [],
     name: "console-start",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
   {
@@ -558,7 +558,7 @@ const cliCommands: CliCommand[] = [
       opt("--page-idx <n>", "page number (0-based)"),
     ],
     name: "console-list",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({
       includePreserved: !!o["includePreserved"],
       pageIdx: o["pageIdx"] ? Number(o["pageIdx"]) : undefined,
@@ -570,17 +570,25 @@ const cliCommands: CliCommand[] = [
     description: "Get a single console message by index",
     flags: [req("--msgid <id>", "message index")],
     name: "console-get",
-    needsPort: true,
+    needsTarget: true,
     toPayload: (o) => ({ msgid: Number(o["msgid"]) }),
   },
   {
     description: "Stop capturing console messages",
     flags: [],
     name: "console-stop",
-    needsPort: true,
+    needsTarget: true,
     toPayload: () => ({}),
   },
 ];
+
+const targetPayload = (opts: Record<string, string>) => {
+  const session = opts["session"];
+  if (session) return { session };
+  const port = opts["port"];
+  if (port) return { port: Number(port) };
+  throw new Error("one of --session or --port is required");
+};
 
 const run =
   (fn: (opts: Record<string, string>) => Promise<string>) =>
@@ -705,8 +713,13 @@ program
 cliCommands.forEach((def) => {
   const cmd = program.command(def.name).description(def.description);
 
-  if (def.needsPort) {
-    cmd.requiredOption("--port <port>", "Chrome debug port");
+  if (def.needsTarget) {
+    const session = new Option(
+      "--session <id>",
+      "browser launched by launch",
+    ).conflicts("port");
+    cmd.addOption(session);
+    cmd.option("--port <port>", "debug port of an external Chrome");
   }
 
   def.flags.forEach((f) => {
@@ -716,8 +729,9 @@ cliCommands.forEach((def) => {
 
   const action = run((opts) => {
     const payload: Record<string, unknown> = { action: def.name };
-    if (def.needsPort && opts["port"]) {
-      payload["port"] = Number(opts["port"]);
+    if (def.needsTarget) {
+      const target = targetPayload(opts);
+      Object.assign(payload, target);
     }
     const extra = def.toPayload(opts);
     Object.assign(payload, extra);

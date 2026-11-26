@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,7 @@ import { z } from "zod";
 import { createActivity, track } from "../activity.ts";
 import { isAlive, type Session } from "../browser.ts";
 import { createCapacity } from "../capacity.ts";
+import { portTarget, targetFields, targetKey } from "../target.ts";
 import {
   killAllCmd,
   killCmd,
@@ -63,7 +64,6 @@ const inspectSession = async (session: Session) => {
   return {
     pid: browserProcess.id,
     pids,
-    port: session.port,
     userDataDir: session.userDataDir,
   };
 };
@@ -106,9 +106,10 @@ const waitForProcesses = async (
   await waitForProcesses(pids, deadline);
 };
 
-const expectAlive = async (port: number, expected: boolean) => {
-  const alive = await isAlive(port);
-  expect(alive).toBe(expected);
+const expectUsable = async (session: Session) => {
+  expect(session.browser.connected).toBe(true);
+  const value = await session.page.evaluate(() => 2 + 2);
+  expect(value).toBe(4);
 };
 
 const expectProfile = (path: string, expected: boolean) => {
@@ -117,7 +118,6 @@ const expectProfile = (path: string, expected: boolean) => {
 };
 
 const expectStopped = async (inspection: Inspection) => {
-  await expectAlive(inspection.port, false);
   expectProfile(inspection.userDataDir, false);
   await waitForProcesses(inspection.pids, Date.now() + 10000);
 };
@@ -142,9 +142,9 @@ test("idle expiry closes the browser and removes its profile", async () => {
   const inspection = await inspectSession(session);
   await setTimeout(200);
   const result = await reapIdleCmd(idle);
-  expect(result).toBe(
-    `{"reaped":[{"pid":${inspection.pid},"port":${session.port}}]}`,
-  );
+  const reaped = { ...targetFields(session.target), pid: inspection.pid };
+  const payload: unknown = await new Response(result).json();
+  expect(payload).toEqual({ reaped: [reaped] });
   expect(idle.sessions.size).toBe(0);
   await expectStopped(inspection);
 }, 30000);
@@ -155,10 +155,11 @@ test("an in-flight command prevents idle expiry", async () => {
     await setTimeout(200);
     return reapIdleCmd(idle);
   };
-  const busy = await track(idle.activity, session.port, reapWhileBusy);
+  const key = targetKey(session.target);
+  const busy = await track(idle.activity, key, reapWhileBusy);
   const afterUse = await reapIdleCmd(idle);
   expect([busy, afterUse]).toEqual(['{"reaped":[]}', '{"reaped":[]}']);
-  await expectAlive(session.port, true);
+  await expectUsable(session);
 }, 30000);
 
 const browserPid = (session: Session): number => {
@@ -172,13 +173,18 @@ test("an unresponsive owned browser is removed and frees capacity", async () => 
   await launchCmd(capped, true);
   const inspection = await inspectSession(session);
   const pid = browserPid(session);
+  const disconnected = Promise.withResolvers<undefined>();
+  session.browser.once("disconnected", () => {
+    disconnected.resolve(undefined);
+  });
   process.kill(pid, "SIGKILL");
+  await disconnected.promise;
   await waitForProcesses([inspection.pid], Date.now() + 10000);
-  const lookup = sessionFor(capped, session.port);
+  const lookup = sessionFor(capped, session.target);
   await expect(lookup).rejects.toThrow(/is not responding, session removed/);
   expectProfile(session.userDataDir, false);
   const replacement = launchCmd(capped, true);
-  await expect(replacement).resolves.toMatch(/"port"/);
+  await expect(replacement).resolves.toMatch(/"session"/);
 }, 30000);
 
 const oneshotPage = (target: DaemonState) =>
@@ -224,9 +230,9 @@ test("parallel launch and oneshot cannot exceed the browser limit", async () => 
 test("killing a browser frees its capacity", async () => {
   const first = await start(capped);
   await launchCmd(capped, true);
-  await killCmd(capped, first.port);
+  await killCmd(capped, first.target);
   const replacement = launchCmd(capped, true);
-  await expect(replacement).resolves.toMatch(/"port"/);
+  await expect(replacement).resolves.toMatch(/"session"/);
 }, 30000);
 
 test("failed launches free capacity", async () => {
@@ -247,25 +253,62 @@ test("kill awaits Chrome exit without killing the CDP client or an unrelated bro
   const session = await start(state);
   const other = await start(unrelated);
   const inspection = await inspectSession(session);
-  const result = await killCmd(state, session.port);
-  expect(result).toBe(`{"killed":${session.port},"pid":${inspection.pid}}`);
+  const result = await killCmd(state, session.target);
+  const killed = { ...targetFields(session.target), pid: inspection.pid };
+  const payload: unknown = await new Response(result).json();
+  expect(payload).toEqual({ killed });
   expect(state.sessions.size).toBe(0);
   await expectStopped(inspection);
-  await expectAlive(other.port, true);
-  const value = await other.page.evaluate(() => 2 + 2);
-  expect(value).toBe(4);
+  await expectUsable(other);
 }, 30000);
 
-test("kill closes only the requested port when it is not registered", async () => {
-  const session = await start(unrelated);
-  const inspection = await inspectSession(session);
-  await killCmd(state, session.port);
-  unrelated.sessions.delete(session.port);
-  const running = await isAlive(session.port);
+const ActivePort = z.coerce.number().int().positive();
+
+const readActivePort = async (
+  userDataDir: string,
+  deadline: number,
+): Promise<number> => {
+  const file = join(userDataDir, "DevToolsActivePort");
+  if (existsSync(file)) {
+    const text = await readFile(file, "utf8");
+    const [port] = text.split("\n");
+    return ActivePort.parse(port);
+  }
+  if (Date.now() >= deadline)
+    throw new Error("external Chrome did not open a debug port");
+  await setTimeout(50);
+  return readActivePort(userDataDir, deadline);
+};
+
+const startExternal = async () => {
+  const executable = z.string().parse(process.env["CHROME_PATH"]);
+  const temp = tmpdir();
+  const prefix = join(temp, "external-chrome-");
+  const userDataDir = await mkdtemp(prefix);
+  const args = [
+    "--headless",
+    "--remote-debugging-port=0",
+    `--user-data-dir=${userDataDir}`,
+    "about:blank",
+  ];
+  const child = spawn(executable, args, { stdio: "ignore" });
+  const port = await readActivePort(userDataDir, Date.now() + 10000);
+  return { child, port, userDataDir };
+};
+
+test("kill closes an external browser by port without registering it", async () => {
+  const external = await startExternal();
+  const exited = once(external.child, "exit");
+  const target = portTarget(external.port);
+  const result = await killCmd(state, target);
+  const payload: unknown = await new Response(result).json();
+  expect(payload).toMatchObject({ killed: { port: external.port } });
+  await exited;
+  const running = await isAlive(external.port);
   expect(running).toBe(false);
-  await waitForProcesses(inspection.pids, Date.now() + 10000);
-  expectProfile(session.userDataDir, true);
-  await rm(session.userDataDir, { recursive: true });
+  expect(state.sessions.size).toBe(0);
+  expectProfile(external.userDataDir, true);
+  await rm(external.userDataDir, { recursive: true });
 }, 30000);
 
 test("kill-all closes tracked browsers and leaves an unrelated browser alone", async () => {
@@ -278,12 +321,10 @@ test("kill-all closes tracked browsers and leaves an unrelated browser alone", a
   expect(state.sessions.size).toBe(0);
   const checks = inspections.map(expectStopped);
   await Promise.all(checks);
-  await expectAlive(other.port, true);
+  await expectUsable(other);
 }, 30000);
 
-test("SIGTERM closes owned browsers before the daemon exits", async () => {
-  const other = await start(unrelated);
-  const script = `
+const OWNER_SCRIPT = `
     import { createActivity } from "./src/activity.ts";
     import { createCapacity } from "./src/capacity.ts";
     import { launchSession, shutdownOnSignals } from "./src/commands/lifecycle.ts";
@@ -300,37 +341,65 @@ test("SIGTERM closes owned browsers before the daemon exits", async () => {
     await client.detach();
     shutdownOnSignals(state);
     console.log(JSON.stringify({
-      port: session.port,
       userDataDir: session.userDataDir,
+      pid: session.browser.process().pid,
       pids: processInfo.map((info) => info.id),
     }));
     setInterval(() => {}, 1000);
   `;
-  const child = spawn(
-    process.execPath,
-    ["--input-type=module", "--eval", script],
-    {
-      stdio: ["ignore", "pipe", "inherit"],
-    },
-  );
+
+const OwnerDetails = z
+  .object({ pid: PidSchema, pids: PidsSchema, userDataDir: z.string() })
+  .readonly();
+
+const startOwner = async () => {
+  const args = ["--input-type=module", "--eval", OWNER_SCRIPT];
+  const child = spawn(process.execPath, args, {
+    stdio: ["ignore", "pipe", "inherit"],
+  });
   const exited = once(child, "exit");
   const lines = createInterface({ input: child.stdout });
-  const firstLine: unknown[] = await once(lines, "line");
-  const [line] = z.tuple([z.string()]).parse(firstLine);
-  const schema = z
-    .object({ pids: PidsSchema, port: z.number(), userDataDir: z.string() })
-    .readonly();
-  const raw: unknown = await new Response(line).json();
-  const details = schema.parse(raw);
+  const firstLine: unknown = await Promise.race([
+    once(lines, "line", { signal: AbortSignal.timeout(15000) }),
+    exited.then((exit) => {
+      throw new Error(`owner exited before reporting browser: ${String(exit)}`);
+    }),
+  ]);
+  lines.close();
+  const [message] = z.tuple([z.string()]).parse(firstLine);
+  const raw: unknown = await new Response(message).json();
+  const details = OwnerDetails.parse(raw);
+  const pids =
+    process.platform === "linux"
+      ? await processTree(details.pid)
+      : details.pids;
+  return { child, details: { ...details, pids }, exited };
+};
+
+const ExitCode = z.tuple([z.number(), z.null()]);
+const ExitSignal = z.tuple([z.null(), z.literal("SIGKILL")]);
+
+test("SIGTERM closes owned browsers before the daemon exits", async () => {
+  const other = await start(unrelated);
+  const { child, details, exited } = await startOwner();
   child.kill("SIGTERM");
   const exit: unknown[] = await exited;
-  const [code] = z.tuple([z.number(), z.null()]).parse(exit);
+  const [code] = ExitCode.parse(exit);
   expect(code).toBe(0);
-  const running = await isAlive(details.port);
-  expect(running).toBe(false);
   expectProfile(details.userDataDir, false);
   await waitForProcesses(details.pids, Date.now() + 10000);
-  await expectAlive(other.port, true);
+  await expectUsable(other);
+}, 30000);
+
+test("SIGKILL on the daemon leaves no owned browser running", async () => {
+  const other = await start(unrelated);
+  const { child, details, exited } = await startOwner();
+  child.kill("SIGKILL");
+  const exit: unknown[] = await exited;
+  expect(ExitSignal.safeParse(exit).success).toBe(true);
+  await waitForProcesses(details.pids, Date.now() + 10000);
+  await rm(details.userDataDir, { recursive: true });
+  await expectUsable(other);
 }, 30000);
 
 const modes: readonly (readonly ["snapshot" | "screenshot" | "failure"])[] = [

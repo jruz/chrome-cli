@@ -4,6 +4,7 @@ import { accessSync, constants, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { setTimeout } from "node:timers/promises";
+import { newSessionTarget, portTarget, type Target } from "./target.ts";
 
 const DARWIN_PATHS = [
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -53,7 +54,7 @@ const chromeExecutable = (): string => {
 export type Session = {
   browser: Browser;
   page: Page;
-  port: number;
+  target: Target;
   userDataDir: string;
 };
 
@@ -68,6 +69,7 @@ const launchBrowser = async (
       handleSIGINT: false,
       handleSIGTERM: false,
       headless,
+      pipe: true,
       timeout: 10000,
       userDataDir,
     });
@@ -82,11 +84,11 @@ export const launch = async (headless: boolean): Promise<Session> => {
   const tmpBase = join(tmp, "chrome-cli-");
   const userDataDir = mkdtempSync(tmpBase);
   const browser = await launchBrowser(headless, userDataDir);
-  const port = Number(new URL(browser.wsEndpoint()).port);
   try {
-    return await createSession(browser, port, userDataDir);
+    const target = newSessionTarget();
+    return await createSession(browser, target, userDataDir);
   } catch (error) {
-    await close(browser, port);
+    await closeOwned(browser);
     rmSync(userDataDir, { recursive: true });
     throw error;
   }
@@ -103,13 +105,13 @@ export const isAlive = async (port: number): Promise<boolean> => {
 
 const createSession = async (
   browser: Browser,
-  port: number,
+  target: Target,
   userDataDir: string,
 ): Promise<Session> => {
   const pages = await browser.pages();
   const first = pages[0];
-  if (!first) throw new Error(`no pages found on port ${port}`);
-  return { browser, page: first, port, userDataDir };
+  if (!first) throw new Error("no pages found in browser");
+  return { browser, page: first, target, userDataDir };
 };
 
 export const connect = async (
@@ -120,7 +122,8 @@ export const connect = async (
     browserURL: `http://127.0.0.1:${port}`,
   });
   try {
-    return await createSession(browser, port, userDataDir);
+    const target = portTarget(port);
+    return await createSession(browser, target, userDataDir);
   } catch (error) {
     await browser.disconnect();
     throw error;
@@ -138,13 +141,30 @@ const waitForClosedPort = async (
   await waitForClosedPort(port, deadline);
 };
 
-export const terminate = async (browser: Browser): Promise<void> => {
+const ownedProcess = (browser: Browser) => {
   const child = browser.process();
   if (!child) throw new Error("browser process is not owned by this daemon");
-  if (child.exitCode !== null || child.signalCode !== null) return;
+  return child;
+};
+
+const hasExited = (child: ReturnType<typeof ownedProcess>): boolean =>
+  child.exitCode !== null || child.signalCode !== null;
+
+export const terminate = async (browser: Browser): Promise<void> => {
+  const child = ownedProcess(browser);
+  if (hasExited(child)) return;
   const exited = once(child, "exit");
   child.kill("SIGKILL");
   await exited;
+};
+
+export const closeOwned = async (browser: Browser): Promise<number> => {
+  const child = ownedProcess(browser);
+  if (child.pid === undefined) throw new Error("browser process has no pid");
+  const exited = hasExited(child) ? Promise.resolve() : once(child, "exit");
+  await browser.close();
+  await exited;
+  return child.pid;
 };
 
 export const close = async (

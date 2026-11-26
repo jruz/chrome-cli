@@ -2,6 +2,7 @@ import {
   launch as launchChrome,
   connect,
   close,
+  closeOwned,
   isAlive,
   terminate,
   type Session,
@@ -13,8 +14,14 @@ import {
   reserve,
   type Capacity,
 } from "../capacity.ts";
-import { expiredPorts, forget, touch, type Activity } from "../activity.ts";
+import { expiredKeys, forget, touch, type Activity } from "../activity.ts";
 import { log } from "../log.ts";
+import {
+  targetFields,
+  targetKey,
+  type Target,
+  type TargetFields,
+} from "../target.ts";
 import type { NetworkCapture } from "./network.ts";
 import type { ConsoleCapture } from "./console.ts";
 import { rm } from "node:fs/promises";
@@ -22,10 +29,12 @@ import { rm } from "node:fs/promises";
 export type DaemonState = {
   activity: Activity;
   capacity: Capacity;
-  sessions: Map<number, Session>;
-  networkCaptures: Map<number, NetworkCapture>;
-  consoleCaptures: Map<number, ConsoleCapture>;
+  sessions: Map<string, Session>;
+  networkCaptures: Map<string, NetworkCapture>;
+  consoleCaptures: Map<string, ConsoleCapture>;
 };
+
+type Closed = TargetFields & { readonly pid: number };
 
 const startBrowser = async (headless: boolean, capacity: Capacity) => {
   try {
@@ -42,9 +51,10 @@ export const launchSession = async (
 ): Promise<Session> => {
   reserve(state.capacity);
   const session = await startBrowser(headless, state.capacity);
-  confirm(state.capacity, session.port);
-  touch(state.activity, session.port);
-  state.sessions.set(session.port, session);
+  const key = targetKey(session.target);
+  confirm(state.capacity, key);
+  touch(state.activity, key);
+  state.sessions.set(key, session);
   return session;
 };
 
@@ -53,88 +63,127 @@ export const launchCmd = async (
   headless: boolean,
 ): Promise<string> => {
   const session = await launchSession(state, headless);
-  return JSON.stringify({ port: session.port });
+  const fields = targetFields(session.target);
+  return JSON.stringify(fields);
 };
 
 const cleanupSession = async (
   state: DaemonState,
-  port: number,
   session: Session,
 ): Promise<void> => {
-  if (state.capacity.owned.has(port)) {
+  const key = targetKey(session.target);
+  if (state.capacity.owned.has(key)) {
     await rm(session.userDataDir, { recursive: true });
   }
-  release(state.capacity, port);
-  forget(state.activity, port);
-  state.sessions.delete(port);
-  state.networkCaptures.delete(port);
-  state.consoleCaptures.delete(port);
+  release(state.capacity, key);
+  forget(state.activity, key);
+  state.sessions.delete(key);
+  state.networkCaptures.delete(key);
+  state.consoleCaptures.delete(key);
+};
+
+const isResponsive = async (session: Session): Promise<boolean> => {
+  if (session.target.kind === "session") return session.browser.connected;
+  return isAlive(session.target.port);
 };
 
 const dropUnresponsive = async (
   state: DaemonState,
-  port: number,
   session: Session,
 ): Promise<never> => {
-  log.warn(`dead session on port ${port}, removing`);
-  if (state.capacity.owned.has(port)) await terminate(session.browser);
+  const key = targetKey(session.target);
+  log.warn(`dead ${key}, removing`);
+  if (session.target.kind === "session") await terminate(session.browser);
   else await session.browser.disconnect();
-  await cleanupSession(state, port, session);
-  throw new Error(`Chrome on port ${port} is not responding, session removed`);
+  await cleanupSession(state, session);
+  throw new Error(`Chrome on ${key} is not responding, session removed`);
 };
+
+const unknownSession = (target: Target): Error =>
+  new Error(`unknown ${targetKey(target)}`);
 
 export const sessionFor = async (
   state: DaemonState,
-  port: number,
+  target: Target,
 ): Promise<Session> => {
-  const existing = state.sessions.get(port);
+  const key = targetKey(target);
+  const existing = state.sessions.get(key);
   if (existing) {
-    if (await isAlive(port)) return existing;
-    return dropUnresponsive(state, port, existing);
+    if (await isResponsive(existing)) return existing;
+    return dropUnresponsive(state, existing);
   }
-  const session = await connect(port, "");
-  state.sessions.set(port, session);
+  if (target.kind === "session") throw unknownSession(target);
+  const session = await connect(target.port, "");
+  state.sessions.set(key, session);
   return session;
 };
 
-const closeSession = async (
+const closeBrowser = (session: Session): Promise<number> => {
+  if (session.target.kind === "session") return closeOwned(session.browser);
+  return close(session.browser, session.target.port);
+};
+
+const closeUnregistered = async (target: Target): Promise<number> => {
+  if (target.kind === "session") throw unknownSession(target);
+  const { browser } = await connect(target.port, "");
+  return close(browser, target.port);
+};
+
+const closeTarget = async (
   state: DaemonState,
-  port: number,
-): Promise<Readonly<{ port: number; pid: number }>> => {
-  const session = state.sessions.get(port);
-  const browser = session ? session.browser : (await connect(port, "")).browser;
-  const pid = await close(browser, port);
-  if (session) await cleanupSession(state, port, session);
-  return { pid, port };
+  target: Target,
+): Promise<Closed> => {
+  const key = targetKey(target);
+  const session = state.sessions.get(key);
+  if (!session) {
+    const pid = await closeUnregistered(target);
+    return { ...targetFields(target), pid };
+  }
+  const pid = await closeBrowser(session);
+  await cleanupSession(state, session);
+  return { ...targetFields(target), pid };
 };
 
 export const killCmd = async (
   state: DaemonState,
-  port: number,
+  target: Target,
 ): Promise<string> => {
-  const { pid } = await closeSession(state, port);
-  return JSON.stringify({ killed: port, pid });
-};
-
-export const killAllCmd = async (state: DaemonState): Promise<string> => {
-  const keys = state.sessions.keys();
-  const ports = Array.from(keys);
-  const tasks = ports.map((port) => closeSession(state, port));
-  const killed = await Promise.all(tasks);
+  const killed = await closeTarget(state, target);
   return JSON.stringify({ killed });
 };
 
+const closeAll = (
+  state: DaemonState,
+  sessions: readonly Session[],
+): Promise<Closed[]> => {
+  const closing = sessions.map(({ target }) => closeTarget(state, target));
+  return Promise.all(closing);
+};
+
+export const killAllCmd = async (state: DaemonState): Promise<string> => {
+  const sessions = [...state.sessions.values()];
+  const killed = await closeAll(state, sessions);
+  return JSON.stringify({ killed });
+};
+
+const registered = (state: DaemonState) => (key: string) => {
+  const session = state.sessions.get(key);
+  if (!session) throw new Error(`no session registered for ${key}`);
+  return session;
+};
+
 export const reapIdleCmd = async (state: DaemonState): Promise<string> => {
-  const ports = expiredPorts(state.activity, state.capacity.owned);
-  const tasks = ports.map((port) => closeSession(state, port));
-  const reaped = await Promise.all(tasks);
+  const keys = expiredKeys(state.activity, state.capacity.owned);
+  const lookup = registered(state);
+  const sessions = keys.map(lookup);
+  const reaped = await closeAll(state, sessions);
   return JSON.stringify({ reaped });
 };
 
 export const statusCmd = (state: DaemonState): string => {
-  const keys = state.sessions.keys();
-  const ports = Array.from(keys);
-  return JSON.stringify({ ports, sessions: ports.length });
+  const sessions = [...state.sessions.values()];
+  const targets = sessions.map(({ target }) => targetFields(target));
+  return JSON.stringify({ sessions: targets.length, targets });
 };
 
 export const shutdownCmd = async (state: DaemonState): Promise<string> => {
