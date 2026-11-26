@@ -9,19 +9,8 @@ import {
 } from "./src/client";
 import { versionString } from "./src/version";
 
-type Flag = {
-  flag: string;
-  description: string;
-  required: boolean;
-};
-
-type CliCommand = {
-  name: string;
-  description: string;
-  needsTarget: boolean;
-  flags: Flag[];
-  toPayload: (opts: Record<string, string>) => Record<string, unknown>;
-};
+import type { CliCommand, Flag } from "./src/command.ts";
+import { snapshotCommand } from "./src/commands/snapshot.ts";
 
 const req = (flag: string, desc: string): Flag => ({
   description: desc,
@@ -129,16 +118,7 @@ const cliCommands: CliCommand[] = [
     needsTarget: true,
     toPayload: (o) => ({ ignoreCache: !!o["ignoreCache"] }),
   },
-  {
-    description: "Take an accessibility tree snapshot",
-    flags: [
-      opt("--verbose", "include all a11y properties"),
-      opt("--path <path>", "save to file"),
-    ],
-    name: "snapshot",
-    needsTarget: true,
-    toPayload: (o) => ({ filePath: o["path"], verbose: !!o["verbose"] }),
-  },
+  snapshotCommand.cli,
   {
     description: "Take a screenshot",
     flags: [

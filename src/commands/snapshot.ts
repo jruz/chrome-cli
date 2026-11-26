@@ -2,6 +2,7 @@ import type { Page } from "puppeteer-core";
 import { writeFile } from "fs/promises";
 import { z } from "zod";
 import { findByUid } from "./interact";
+import { definePageCommand } from "../command.ts";
 
 const RawAXNodeSchema = z.object({
   childIds: z.string().array().optional(),
@@ -101,6 +102,36 @@ export const snapshot = async (
 
   return text;
 };
+
+const SnapshotParams = z
+  .object({
+    filePath: z
+      .string({ error: "param 'filePath' must be a string" })
+      .optional(),
+    verbose: z.coerce.boolean().optional(),
+  })
+  .readonly();
+
+export const snapshotCommand = definePageCommand(
+  {
+    description: "Take an accessibility tree snapshot",
+    flags: [
+      {
+        description: "include all a11y properties",
+        flag: "--verbose",
+        required: false,
+      },
+      { description: "save to file", flag: "--path <path>", required: false },
+    ],
+    name: "snapshot",
+    toPayload: (opts) => ({
+      filePath: opts["path"],
+      verbose: !!opts["verbose"],
+    }),
+  },
+  SnapshotParams,
+  (page, { filePath, verbose }) => snapshot(page, verbose === true, filePath),
+);
 
 type ScreenshotFormat = "png" | "jpeg" | "webp";
 

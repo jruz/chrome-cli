@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync, type Stats } from "node:fs";
 import { z } from "zod";
+import { send } from "./client.ts";
 import { SOCKET_PATH } from "./config.ts";
 
 const env = { ...process.env, REVISION: "test" };
@@ -83,6 +84,32 @@ const spawnDaemon = () =>
   });
 
 afterEach(killDaemons);
+
+test("snapshot keeps its CLI options", async () => {
+  const help = await cli("snapshot", "--help");
+  expect(help).toContain("--verbose");
+  expect(help).toContain("--path <path>");
+  expect(help).toContain("--session <id>");
+  expect(help).toContain("--port <port>");
+});
+
+test.skipIf(process.platform !== "linux")(
+  "snapshot validates options before resolving its session",
+  async () => {
+    await cli("daemon-start");
+    const result = send({
+      action: "snapshot",
+      filePath: 42,
+      session: "missing",
+    });
+    const [outcome] = await Promise.allSettled([result]);
+    expect(outcome).toEqual({
+      reason: new Error("param 'filePath' must be a string"),
+      status: "rejected",
+    });
+  },
+  20_000,
+);
 
 test.skipIf(process.platform !== "linux")(
   "parallel cold start produces one daemon and one reachable socket",

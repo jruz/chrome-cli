@@ -11,7 +11,7 @@ import {
   navigateForward,
   reload,
 } from "./commands/navigate";
-import { snapshot, screenshot } from "./commands/snapshot";
+import { snapshot, screenshot, snapshotCommand } from "./commands/snapshot.ts";
 import {
   click,
   hover,
@@ -94,6 +94,7 @@ type CommandResult = Promise<string> | string;
 
 type CommandDef =
   | { needs: "page"; run: (page: Page, p: Params) => CommandResult }
+  | { needs: "page"; prepare: (p: Params) => (page: Page) => CommandResult }
   | { needs: "browser"; run: (browser: Browser, p: Params) => CommandResult }
   | { needs: "daemon"; run: (p: Params) => CommandResult };
 
@@ -255,17 +256,7 @@ const commands = new Map<string, CommandDef>([
     },
   ],
 
-  [
-    "snapshot",
-    {
-      needs: "page",
-      run: (page, p) => {
-        const verbose = bool(p, "verbose");
-        const filePath = optStr(p, "filePath");
-        return snapshot(page, verbose, filePath);
-      },
-    },
-  ],
+  [snapshotCommand.cli.name, snapshotCommand.daemon],
   [
     "screenshot",
     {
@@ -761,9 +752,13 @@ const dispatch = async (params: Params): Promise<string> => {
 
   switch (def.needs) {
     case "page": {
+      const run =
+        "prepare" in def
+          ? def.prepare(params)
+          : (page: Page) => def.run(page, params);
       const target = parseTarget(params);
       const { page } = await getSession(target);
-      const result = await def.run(page, params);
+      const result = await run(page);
       if (bool(params, "includeSnapshot") && SNAPSHOT_ACTIONS.has(action)) {
         const snap = await snapshot(page, false, undefined);
         return mergeWithSnapshot(result, snap);
