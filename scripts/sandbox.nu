@@ -17,11 +17,12 @@ const CONFIG_TYPES = {
 
 const RUNTIME_COMMANDS = {
     bun: [bun]
+    go: [go gofmt]
     node: [node pnpm]
     rust: [cargo cargo-* rustc rustup rustfmt rust-analyzer sqlx]
 }
 
-const BUILT_RUNTIMES = [node rust]
+const BUILT_RUNTIMES = [go node rust]
 
 def known-commands []: nothing -> list<string> {
     $RUNTIME_COMMANDS | values | flatten
@@ -114,8 +115,22 @@ def ensure-image []: record -> nothing {
     }
 }
 
+def go-version [root: path]: nothing -> string {
+    (open --raw ($root | path join go.mod)
+        | lines
+        | parse --regex '^go (?<version>\S+)$'
+        | get version
+        | first)
+}
+
 def image-config [root: path, runtime: string]: nothing -> record {
     match $runtime {
+        go => {
+            {
+                name: go
+                build_args: {GO_VERSION: (go-version $root)}
+            }
+        }
         node => {
             let engines = (open ($root | path join package.json) | get engines)
             {
@@ -158,9 +173,18 @@ def pnpm-cache []: nothing -> path {
     $env.HOME | path join .cache pnpm
 }
 
+def go-module-cache []: nothing -> path {
+    $env.HOME | path join go pkg mod
+}
+
+def go-build-cache []: nothing -> path {
+    $env.HOME | path join .cache go-build
+}
+
 def cache-dirs [runtime: string]: nothing -> list<path> {
     match $runtime {
         bun => []
+        go => [(go-module-cache) (go-build-cache)]
         node => [(pnpm-store) (pnpm-cache)]
         rust => [($env.HOME | path join .cargo registry) ($env.HOME | path join .cargo git)]
     }
@@ -169,6 +193,11 @@ def cache-dirs [runtime: string]: nothing -> list<path> {
 def runtime-env [runtime: string]: nothing -> list<string> {
     match $runtime {
         bun => []
+        go => [
+            --env $"GOMODCACHE=(go-module-cache)"
+            --env $"GOCACHE=(go-build-cache)"
+            --env GOTOOLCHAIN=local
+        ]
         node => [
             --env $"pnpm_config_store_dir=(pnpm-store)/store"
             --env $"pnpm_config_cache_dir=(pnpm-cache)"

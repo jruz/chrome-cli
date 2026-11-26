@@ -13,6 +13,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (builtins.fromJSON (builtins.readFile ./package.json)) engines;
+        goVersion = builtins.head (builtins.match ".*\ngo ([^\n]+)\n.*" (builtins.readFile ./go.mod));
         sandbox = pkgs.writeShellScriptBin "sandbox" ''
           export PATH=${
             pkgs.lib.makeBinPath [
@@ -42,6 +43,7 @@
             echo "  node         ${engines.node} (docker)"
             echo "  pnpm         ${engines.pnpm} (docker)"
             echo "  bun          ${engines.bun} (docker)"
+            echo "  go           ${goVersion} (docker)"
             echo ""
           '';
         };
