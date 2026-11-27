@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"crypto/rand"
+	"maps"
 	"strings"
 	"time"
 
@@ -9,16 +10,24 @@ import (
 	"github.com/jruz/chrome-cli/internal/commands"
 	"github.com/jruz/chrome-cli/internal/page"
 	"github.com/jruz/chrome-cli/internal/protocol"
+	"github.com/jruz/chrome-cli/internal/recorder"
 )
 
 const idLength = 4
+
+type tab struct {
+	page     *page.Page
+	recorder *recorder.Recorder
+}
 
 type session struct {
 	target    protocol.Target
 	owned     *browser.Owned
 	external  *browser.External
 	page      *page.Page
+	recorder  *recorder.Recorder
 	emulation commands.Emulation
+	contexts  map[string]string
 }
 
 type state struct {
@@ -89,13 +98,13 @@ func (e launchFailed) apply(s *state) {
 
 type launchConfirmed struct {
 	owned *browser.Owned
-	page  *page.Page
+	first tab
 	reply chan session
 }
 
 func (e launchConfirmed) apply(s *state) {
 	target := protocol.Target{Session: unusedID(s.sessions)}
-	confirmed := session{target: target, owned: e.owned, page: e.page}
+	confirmed := session{target: target, owned: e.owned, page: e.first.page, recorder: e.first.recorder, contexts: map[string]string{}}
 	s.capacity = s.capacity.settle()
 	s.sessions[target.Key()] = confirmed
 	s.activity.touch(target.Key(), time.Now())
@@ -154,6 +163,41 @@ func (e emulationChanged) apply(s *state) {
 	current, found := s.sessions[e.key]
 	if found {
 		current.emulation = e.emulation
+		s.sessions[e.key] = current
+	}
+	e.reply <- struct{}{}
+}
+
+type pageSelected struct {
+	key      string
+	selected tab
+	reply    chan struct{}
+}
+
+func (e pageSelected) apply(s *state) {
+	current, found := s.sessions[e.key]
+	if found {
+		current.page = e.selected.page
+		current.recorder = e.selected.recorder
+		current.emulation = commands.Emulation{}
+		s.sessions[e.key] = current
+	}
+	e.reply <- struct{}{}
+}
+
+type contextCreated struct {
+	key   string
+	name  string
+	id    string
+	reply chan struct{}
+}
+
+func (e contextCreated) apply(s *state) {
+	current, found := s.sessions[e.key]
+	if found {
+		contexts := maps.Clone(current.contexts)
+		contexts[e.name] = e.id
+		current.contexts = contexts
 		s.sessions[e.key] = current
 	}
 	e.reply <- struct{}{}

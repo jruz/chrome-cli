@@ -28,6 +28,11 @@ const (
 	ActionDrag       = "drag"
 	ActionScroll     = "scroll"
 	ActionWait       = "wait"
+	ActionConsole    = "console"
+	ActionNetwork    = "network"
+	ActionText       = "text"
+	ActionPages      = "pages"
+	ActionNewPage    = "new-page"
 )
 
 type Request struct {
@@ -235,6 +240,68 @@ type WaitParams struct {
 
 type Found struct {
 	Text string `json:"found"`
+}
+
+type ConsoleMessage struct {
+	Level string `json:"level"`
+	Text  string `json:"text"`
+	Count int    `json:"count"`
+}
+
+type ConsoleParams struct {
+	All bool `json:"all"`
+}
+
+type Console struct {
+	Messages []ConsoleMessage `json:"messages"`
+}
+
+type NetworkRequest struct {
+	Method string `json:"method"`
+	URL    string `json:"url"`
+	Type   string `json:"type"`
+	Status int    `json:"status,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (r NetworkRequest) Failed() bool {
+	return r.Error != "" || r.Status >= 400
+}
+
+type NetworkParams struct {
+	All bool `json:"all"`
+}
+
+type Network struct {
+	Requests []NetworkRequest `json:"requests"`
+}
+
+type TextParams struct {
+	Target string `json:"target,omitempty"`
+	Max    int    `json:"max"`
+}
+
+type Text struct {
+	Text      string `json:"text"`
+	Truncated int    `json:"truncated,omitempty"`
+}
+
+type PageInfo struct {
+	TargetID string `json:"targetId"`
+	Title    string `json:"title"`
+	URL      string `json:"url"`
+	Selected bool   `json:"selected"`
+}
+
+type Pages struct {
+	Pages []PageInfo `json:"pages"`
+}
+
+type NewPageParams struct {
+	URL             string        `json:"url"`
+	Background      bool          `json:"background"`
+	IsolatedContext string        `json:"isolatedContext,omitempty"`
+	Timeout         time.Duration `json:"timeout"`
 }
 
 type OneshotParams struct {

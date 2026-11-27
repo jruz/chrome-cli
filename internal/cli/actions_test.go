@@ -29,6 +29,14 @@ var pages = map[string]string{
 		<button id="source" onmousedown="document.body.dataset.from = 'source'">Source</button>
 		<button id="sink" onmouseup="document.body.dataset.to = 'sink'">Sink</button>`,
 	"/later": `<script>setTimeout(() => document.body.append('Ready'), 300)</script>`,
+	"/console": `<script>
+		for (let i = 0; i < 50; i++) console.error("boom");
+		console.warn("careful");
+		console.log("hi");
+	</script>`,
+	"/assets": `<img src="/missing.png"><img src="/ok.png">`,
+	"/ok.png": ``,
+	"/dialog": `<main>Main text</main><div role="dialog" aria-label="Confirm"><p>Delete forever?</p></div>`,
 }
 
 type submissions chan url.Values
@@ -42,6 +50,7 @@ func app(t *testing.T) (*httptest.Server, submissions) {
 			fmt.Fprintf(w, page, strings.TrimPrefix(path, "/"), body)
 		})
 	}
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	mux.HandleFunc("POST /submitted", func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Errorf("parse form: %v", err)

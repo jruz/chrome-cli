@@ -17,13 +17,54 @@ type Page struct {
 	SessionID string
 }
 
-type targetInfo struct {
+type TargetInfo struct {
 	TargetID string `json:"targetId"`
 	Type     string `json:"type"`
+	Title    string `json:"title"`
+	URL      string `json:"url"`
 }
 
 type targets struct {
-	TargetInfos []targetInfo `json:"targetInfos"`
+	TargetInfos []TargetInfo `json:"targetInfos"`
+}
+
+type created struct {
+	TargetID         string `json:"targetId"`
+	BrowserContextID string `json:"browserContextId"`
+}
+
+func (p *Page) Targets(ctx context.Context) ([]TargetInfo, error) {
+	var found targets
+	if err := p.conn.Call(ctx, "", "Target.getTargets", nil, &found); err != nil {
+		return nil, err
+	}
+	var pages []TargetInfo
+	for _, info := range found.TargetInfos {
+		if info.Type == "page" {
+			pages = append(pages, info)
+		}
+	}
+	return pages, nil
+}
+
+func (p *Page) Open(ctx context.Context, background bool, contextID string, report func(error)) (*Page, error) {
+	params := map[string]any{"url": "about:blank", "background": background}
+	if contextID != "" {
+		params["browserContextId"] = contextID
+	}
+	var target created
+	if err := p.conn.Call(ctx, "", "Target.createTarget", params, &target); err != nil {
+		return nil, err
+	}
+	return Attach(ctx, p.conn, target.TargetID, report)
+}
+
+func (p *Page) CreateContext(ctx context.Context) (string, error) {
+	var context created
+	if err := p.conn.Call(ctx, "", "Target.createBrowserContext", map[string]bool{"disposeOnDetach": true}, &context); err != nil {
+		return "", err
+	}
+	return context.BrowserContextID, nil
 }
 
 type attached struct {
@@ -79,6 +120,7 @@ func (p *Page) enable(ctx context.Context) error {
 		{"Page.setLifecycleEventsEnabled", map[string]bool{"enabled": true}},
 		{"Runtime.enable", nil},
 		{"Network.enable", nil},
+		{"Log.enable", nil},
 	}
 	for _, step := range steps {
 		if err := p.Call(ctx, step.method, step.params, nil); err != nil {

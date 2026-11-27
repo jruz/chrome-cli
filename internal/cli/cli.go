@@ -51,6 +51,11 @@ type root struct {
 	Drag         dragCmd         `cmd:"" help:"Drag one element onto another."`
 	Scroll       scrollCmd       `cmd:"" help:"Scroll the page and print the scroll position."`
 	Wait         waitCmd         `cmd:"" help:"Wait until any of the texts appears."`
+	Text         textCmd         `cmd:"" help:"Print the visible text of the page or an element."`
+	Console      consoleCmd      `cmd:"" help:"Show console errors and warnings since launch."`
+	Network      networkCmd      `cmd:"" help:"Show failed requests since launch."`
+	Pages        pagesCmd        `cmd:"" help:"List open tabs; * marks the selected one."`
+	NewPage      newPageCmd      `cmd:"" name:"new-page" help:"Open a tab, select it, and load a URL."`
 	Oneshot      oneshotCmd      `cmd:"" help:"Launch, load a URL, capture a snapshot or screenshot, and close."`
 	DaemonStart  daemonStartCmd  `cmd:"" name:"daemon-start" help:"Start the background daemon."`
 	DaemonStatus daemonStatusCmd `cmd:"" name:"daemon-status" help:"Show the daemon and its sessions."`

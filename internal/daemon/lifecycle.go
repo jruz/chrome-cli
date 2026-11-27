@@ -13,6 +13,7 @@ import (
 	"github.com/jruz/chrome-cli/internal/commands"
 	"github.com/jruz/chrome-cli/internal/page"
 	"github.com/jruz/chrome-cli/internal/protocol"
+	"github.com/jruz/chrome-cli/internal/recorder"
 )
 
 const (
@@ -53,22 +54,26 @@ func (d daemon) launchSession(ctx context.Context, headless bool) (session, erro
 		ask(d.store, func(reply chan struct{}) event { return launchFailed{reply: reply} })
 		return session{}, err
 	}
-	launched := ask(d.store, func(reply chan session) event { return launchConfirmed{owned: owned, page: first, reply: reply} })
+	launched := ask(d.store, func(reply chan session) event { return launchConfirmed{owned: owned, first: first, reply: reply} })
 	go d.watch(launched.target, owned)
 	d.log.Info("launched", "session", launched.target.Session, "pid", owned.Pid)
 	return launched, nil
 }
 
-func (d daemon) startBrowser(ctx context.Context, headless bool) (*browser.Owned, *page.Page, error) {
+func (d daemon) startBrowser(ctx context.Context, headless bool) (*browser.Owned, tab, error) {
 	owned, err := browser.Launch(ctx, headless)
 	if err != nil {
-		return nil, nil, err
+		return nil, tab{}, err
 	}
 	first, err := page.First(ctx, owned.Conn, d.reportPageError)
 	if err != nil {
-		return nil, nil, errors.Join(err, owned.Kill())
+		return nil, tab{}, errors.Join(err, owned.Kill())
 	}
-	return owned, first, nil
+	return owned, d.record(first), nil
+}
+
+func (d daemon) record(p *page.Page) tab {
+	return tab{page: p, recorder: recorder.Start(p, d.reportPageError)}
 }
 
 func (d daemon) watch(target protocol.Target, owned *browser.Owned) {
@@ -109,7 +114,14 @@ func (d daemon) connect(ctx context.Context, target protocol.Target) (session, e
 	if err != nil {
 		return session{}, errors.Join(err, external.Disconnect())
 	}
-	candidate := session{target: target, external: external, page: first}
+	recorded := d.record(first)
+	candidate := session{
+		target:   target,
+		external: external,
+		page:     recorded.page,
+		recorder: recorded.recorder,
+		contexts: map[string]string{},
+	}
 	registered := ask(d.store, func(reply chan session) event { return externalRegistered{candidate: candidate, reply: reply} })
 	if registered.external != external {
 		return registered, external.Disconnect()
