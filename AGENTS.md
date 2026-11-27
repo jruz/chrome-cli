@@ -4,101 +4,55 @@ CLI tool for controlling Chrome via CDP (Chrome DevTools Protocol). Designed for
 
 ## Stack
 
-- Runtime: Bun
-- Language: TypeScript
-- CDP client: puppeteer-core
-- CLI framework: commander
+- Language: Go, built with `CGO_ENABLED=0` into a static binary
+- CLI framework: kong
+- CDP: raw JSON over `--remote-debugging-pipe` for owned browsers and a websocket for `--port`
 - No MCP — direct CLI invocation via Unix socket daemon
 
 ## Architecture
 
-- `cli.ts` — thin CLI client, parses flags with commander, sends JSON to daemon, prints response
-- `src/client.ts` — `send()` POSTs JSON to Unix socket, `ensureDaemon()` auto-starts daemon on first call
-- `src/daemon.ts` — long-lived Bun HTTP server on `/tmp/chrome-cli-<uid>/daemon.sock`, holds sessions map, routes commands
-- `src/browser.ts` — `launch()` owns Chrome via a CDP pipe and a temporary profile
-- `connect()` attaches to external Chrome by port
-- `src/target.ts` — validates session and port targets
-- `src/config.ts` — private per-user runtime directory with socket and lock paths, browser limit
-- `src/capacity.ts` — reserves browser slots before launch and releases them after confirmed exit
-- `src/activity.ts` — tracks last use and in-flight commands so idle owned browsers can be reaped
-- `src/daemon-lock.ts` — `flock` ownership lock so one daemon binds the socket
-- `src/commands/` — each command owns its flags, request schema, and handler
-- `src/commands.ts` — shared registry for commands sent over the socket
-- `src/command.ts` — validates requests and tracks activity for targeted commands
-- `src/log.ts` — structured JSON logging with `severity` field: `log.info()`, `log.warn()`, `log.error()`
+- `cmd/chrome-cli` — entry point calling `cli.Main`
+- `internal/cli` — kong command structs, one per command, sending requests through the client
+- `internal/client` — HTTP over the daemon socket, auto-starts `daemon-serve`
+- `internal/daemon` — single-owner daemon with a store goroutine applying typed events
+- `internal/daemon/lock.go` — `flock` ownership so one daemon binds the socket
+- `internal/daemon/capacity.go` — reserves browser slots before launch and releases them after confirmed exit
+- `internal/daemon/activity.go` — tracks last use and in-flight commands for idle reaping
+- `internal/cdp` — CDP connection routing responses by ID and events by session
+- `internal/browser` — owned Chrome over a pipe and external Chrome by port
+- `internal/page` — attached page targets, evaluation, and dialog auto-accept
+- `internal/commands` — CDP logic for each command
+- `internal/target` — resolves uids and `role "name"` targets
+- `internal/settle` — waits for navigation, network idle, and a quiet DOM after actions
+- `internal/recorder` — console and network history per page
+- `internal/protocol` — request and result types shared by the CLI and daemon
+- `internal/output` — plain text or `--json` output and one-line errors
+- `internal/orphans` — `kill-all --include-orphans` cleanup on Linux
 
 ## Flow
 
-1. CLI parses flags into `{ action, ...params }`, including either `session` or `port` for browser commands
-2. Sends JSON to daemon over Unix socket
-3. Daemon dispatches to the registered command, which validates its input
-4. Browser commands look up a session when they need one
-5. CLI prints result
+1. The CLI parses flags into a protocol request with an optional target
+2. The client sends it to `/tmp/chrome-cli-<uid>/daemon.sock`
+3. The daemon resolves the target and tracks the command for idle reaping
+4. The command runs against the selected page
+5. The CLI prints plain text or JSON
 
 ## Development
 
-- `just chrome-run <command> [options]` — run CLI
-- `just ts::tsc-check` — type check
-- `just setup` — install locked dependencies with pnpm
-- `just test` — run Oxlint rule tests, Bun script and daemon startup tests, and Vitest lifecycle tests
-- `just check` — lint, format-check, and type-check the project
-- `just tools::check` — validate repository configuration
-- `just chrome-bench` — run benchmark
+- `just check` — gofmt, go vet, and staticcheck in the sandbox
+- `just test` — Go tests against sandboxed Chromium
+- `just fix` — format Go files
+- `just chrome-run <command> [options]` — build and run the CLI
 - `just install` — build and copy to `~/.local/bin/`
+- `just tools::check` — validate repository configuration
 
 ## Claude Code Skill
 
-`skills/chrome/SKILL.md` — bundled skill for Claude Code users of chrome-cli. Keep it in sync with the commands below when adding or changing commands.
+`skills/chrome/SKILL.md` — bundled skill for Claude Code users of chrome-cli. Keep it in sync with the commands in `internal/cli`.
 
 ## Release
 
-Releases are paused until the Go cutover adds a GitHub release pipeline.
-
-## Commands
-
-`launch` returns `{ "session": "<id>" }`. For external Chrome, replace `--session <id>` with `--port <port>`.
-
-```
-chrome-cli oneshot --url <url> --mode snapshot|screenshot [--timeout <ms>] [--path <file>] [--verbose] [--full-page] [--format <format>] [--quality <n>] [--width <px>] [--height <px>]
-chrome-cli launch [--headed]
-chrome-cli kill --session <id>
-chrome-cli kill-all [--include-orphans]
-chrome-cli navigate --session <id> --url <url> --timeout <ms> [--init-script <code>]
-chrome-cli back|forward --session <id>
-chrome-cli reload --session <id> [--ignore-cache]
-chrome-cli snapshot --session <id> [--verbose] [--path <file>]
-chrome-cli screenshot --session <id> --format png|jpeg|webp [--path <file>] [--full-page] [--quality <n>] [--uid <uid>]
-chrome-cli click --session <id> --uid <uid> [--dbl-click]
-chrome-cli hover --session <id> --uid <uid>
-chrome-cli fill --session <id> --uid <uid> --value <text>
-chrome-cli type --session <id> --text <text> [--submit-key <key>]
-chrome-cli press --session <id> --key <key>
-chrome-cli drag --session <id> --from <uid> --to <uid>
-chrome-cli upload --session <id> --uid <uid> --file <path>
-chrome-cli fill-form --session <id> --fields '[{"uid":"1","value":"x"}]'
-chrome-cli resize --session <id> --width 1024 --height 768
-chrome-cli eval --session <id> --expression <code> [--args '<json>']
-chrome-cli pages --session <id>
-chrome-cli new-page --session <id> --url <url> [--background] [--isolated-context <name>]
-chrome-cli close-page --session <id> --page-id <id>
-chrome-cli select-page --session <id> --page-id <id>
-chrome-cli emulate --session <id> [--viewport WxH] [--user-agent <str>] [--geolocation lat,lng] [--color-scheme dark|light] [--cpu-throttling <rate>] [--network-conditions <preset>]
-chrome-cli wait --session <id> --text <texts> --timeout <ms>
-chrome-cli dialog --session <id> --action accept|dismiss [--prompt-text <text>]
-chrome-cli network-start --session <id>
-chrome-cli network-list --session <id> [--type <type>] [--page-size <n>] [--page-idx <n>]
-chrome-cli network-get --session <id> --reqid <id> [--request-file <path>] [--response-file <path>]
-chrome-cli network-stop --session <id>
-chrome-cli console-start --session <id>
-chrome-cli console-list --session <id> [--type <type>] [--include-preserved] [--page-size <n>] [--page-idx <n>]
-chrome-cli console-get --session <id> --msgid <id>
-chrome-cli console-stop --session <id>
-chrome-cli trace-start --session <id> [--path <file>] [--reload] [--auto-stop]
-chrome-cli trace-stop --session <id> [--path <file>]
-chrome-cli trace-analyze --path <file>
-chrome-cli trace-analyze-insight --path <file> --insight-set-id <id> --insight-name <name>
-chrome-cli heap-snapshot --session <id> --path <file>
-chrome-cli daemon-start
-chrome-cli daemon-status
-chrome-cli daemon-stop
-```
+1. `just release bump patch|minor|major` starts the Woodpecker manual pipeline
+2. `.woodpecker/release.yml` runs `scripts/release.nu publish <version>`
+3. The pipeline cross-compiles four binaries, records their hashes in `release.json`, and publishes a GitHub release
+4. `just release delete <tag>` removes a release and its tag

@@ -1,95 +1,68 @@
 ---
 name: chrome
-description: Debug UI with chrome-cli via CDP. Use when visually verifying changes, taking screenshots, inspecting DOM, network capture, or browser automation.
+description: Debug UI with chrome-cli via CDP. Use when visually verifying changes, taking screenshots, inspecting DOM, console errors, failed requests, or browser automation.
 ---
 
 # UI Debugging with chrome-cli
 
-Use `chrome-cli` to control Chrome via CDP for visual verification during development.
+Use `chrome-cli` to drive headless Chrome for visual verification during development.
 
 ## One-shot
 
-For quick content retrieval without managing browser lifecycle:
+- Text: `chrome-cli oneshot snapshot <url>`
+- Screenshot: `chrome-cli oneshot screenshot <url>` prints the saved path
+- Matrix: `chrome-cli oneshot screenshot <url> --viewport mobile,desktop --color-scheme light,dark`
 
-- Text: `chrome-cli oneshot --url <url> --mode snapshot`
-- Screenshot: `chrome-cli oneshot --url <url> --mode screenshot --path /tmp/page.png`
-- Verbose text: `chrome-cli oneshot --url <url> --mode snapshot --verbose`
+## Session Workflow
 
-Defaults: timeout 30s, viewport 1366x768, png format, full-page screenshots.
-Uses `networkidle0` wait strategy — works with SPAs.
-
-## Multi-step Debug Workflow
-
-1. Launch: `chrome-cli launch` (returns `{ "session": "<id>" }`)
-2. Navigate: `chrome-cli navigate --session <id> --url <url> --timeout 10000`
-3. Snapshot: `chrome-cli snapshot --session <id>` (get uids)
-4. Screenshot: `chrome-cli screenshot --session <id> --format png --path /tmp/debug.png`
-5. Interact using uids from snapshot
-6. Kill: `chrome-cli kill --session <id>`
-
-`kill` waits for the requested browser to close before reporting success.
-`kill-all` and `daemon-stop` close only sessions tracked by that daemon.
-
-On Linux, use `kill-all --include-orphans` for emergency cleanup without the socket. It stops the current user’s Chrome CLI daemons and browsers, including other agents’ sessions.
+1. `s=$(chrome-cli launch --url http://localhost:3000)` prints a session ID such as `k3f9`
+2. `chrome-cli snapshot -s $s` prints the accessibility tree with uids
+3. `chrome-cli click -s $s 'button "Save"' --wait-for Saved`
+4. `chrome-cli screenshot -s $s` prints a path to `Read`
+5. `chrome-cli console -s $s` and `chrome-cli network -s $s` show errors since launch
+6. `chrome-cli kill -s $s`
 
 ## Commands
 
-| Command                 | Purpose                       | Key Flags                                                                                                          |
-| ----------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `oneshot`               | One-shot page capture         | `--url --mode [--timeout] [--path] [--verbose] [--full-page] [--format] [--quality] [--width] [--height]`          |
-| `launch`                | Start Chrome instance         | `--headed`                                                                                                         |
-| `kill`                  | Stop Chrome instance          | `--session`                                                                                                        |
-| `kill-all`              | Stop tracked instances        | `[--include-orphans]`                                                                                              |
-| `navigate`              | Go to URL                     | `--session --url --timeout [--init-script]`                                                                        |
-| `back`                  | Navigate back                 | `--session`                                                                                                        |
-| `forward`               | Navigate forward              | `--session`                                                                                                        |
-| `reload`                | Reload page                   | `--session [--ignore-cache]`                                                                                       |
-| `snapshot`              | Accessibility tree (get uids) | `--session [--verbose] [--path]`                                                                                   |
-| `screenshot`            | Capture image                 | `--session --format [--path] [--full-page] [--quality] [--uid]`                                                    |
-| `click`                 | Click element                 | `--session --uid [--dbl-click]`                                                                                    |
-| `hover`                 | Hover element                 | `--session --uid`                                                                                                  |
-| `fill`                  | Type into input               | `--session --uid --value`                                                                                          |
-| `type`                  | Type into focused element     | `--session --text [--submit-key]`                                                                                  |
-| `press`                 | Press key                     | `--session --key`                                                                                                  |
-| `drag`                  | Drag element                  | `--session --from --to`                                                                                            |
-| `upload`                | Upload file                   | `--session --uid --file`                                                                                           |
-| `fill-form`             | Batch fill inputs             | `--session --fields '[{"uid":"1","value":"x"}]'`                                                                   |
-| `resize`                | Set viewport size             | `--session --width --height`                                                                                       |
-| `eval`                  | Run JavaScript                | `--session --expression [--args]`                                                                                  |
-| `pages`                 | List open pages               | `--session`                                                                                                        |
-| `new-page`              | Open new tab                  | `--session --url [--background] [--isolated-context] [--timeout]`                                                  |
-| `close-page`            | Close tab                     | `--session --page-id`                                                                                              |
-| `select-page`           | Switch tab                    | `--session --page-id`                                                                                              |
-| `emulate`               | Device emulation              | `--session [--viewport] [--color-scheme] [--cpu-throttling] [--network-conditions] [--user-agent] [--geolocation]` |
-| `wait`                  | Wait for text                 | `--session --text --timeout`                                                                                       |
-| `dialog`                | Handle dialog                 | `--session --action [--prompt-text]`                                                                               |
-| `network-start`         | Start capture                 | `--session`                                                                                                        |
-| `network-list`          | List requests                 | `--session [--type] [--page-size] [--page-idx]`                                                                    |
-| `network-get`           | Get request detail            | `--session --reqid [--request-file] [--response-file]`                                                             |
-| `network-stop`          | Stop capture                  | `--session`                                                                                                        |
-| `console-start`         | Start capture                 | `--session`                                                                                                        |
-| `console-list`          | List messages                 | `--session [--type] [--include-preserved] [--page-size] [--page-idx]`                                              |
-| `console-get`           | Get message detail            | `--session --msgid`                                                                                                |
-| `console-stop`          | Stop capture                  | `--session`                                                                                                        |
-| `trace-start`           | Start perf trace              | `--session [--path] [--reload] [--auto-stop]`                                                                      |
-| `trace-stop`            | Stop perf trace               | `--session [--path]`                                                                                               |
-| `trace-analyze`         | Analyze trace file            | `--path`                                                                                                           |
-| `trace-analyze-insight` | Drill into insight            | `--path --insight-set-id --insight-name`                                                                           |
-| `heap-snapshot`         | Memory snapshot               | `--session --path`                                                                                                 |
-| `daemon-start`          | Start daemon                  |                                                                                                                    |
-| `daemon-status`         | Check daemon                  |                                                                                                                    |
-| `daemon-stop`           | Stop daemon                   |                                                                                                                    |
+| Command       | Purpose                                         | Key flags                                                                                                     |
+| ------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `launch`      | Start Chrome and print the session ID           | `[--url] [--headed]`                                                                                          |
+| `kill`        | Close a browser                                 |                                                                                                               |
+| `kill-all`    | Close every tracked browser                     | `[--include-orphans]`                                                                                         |
+| `navigate`    | Load a URL, print `title — url`                 | `<url> [--timeout] [--init-script]`                                                                           |
+| `back`        | Go back in history                              |                                                                                                               |
+| `reload`      | Reload the page                                 | `[--ignore-cache]`                                                                                            |
+| `snapshot`    | Accessibility tree with uids                    | `[--verbose] [--path]`                                                                                        |
+| `screenshot`  | Save images and print paths                     | `[--format] [--full-page] [--quality] [--path] [--viewport list] [--color-scheme list]`                       |
+| `text`        | Visible text of `main`, `body`, or an element   | `[target] [--max]`                                                                                            |
+| `eval`        | Run JavaScript and print the value              | `<expression> [--args uid,…]`                                                                                 |
+| `click`       | Click an element                                | `<target> [--dbl-click]`                                                                                      |
+| `fill`        | Set a text input, select option, or checkbox    | `<target> <value>`                                                                                            |
+| `fill-form`   | Fill fields by label                            | `'Label=value' … [--submit target]`                                                                           |
+| `press`       | Press a key                                     | `<key>`                                                                                                       |
+| `hover`       | Hover an element                                | `<target>`                                                                                                    |
+| `drag`        | Drag one element onto another                   | `<from> <to>`                                                                                                 |
+| `scroll`      | Scroll and print `scrollY <y> / <height>`       | `[top \| bottom \| target] [--by px]`                                                                         |
+| `wait`        | Wait for any of the texts                       | `<text>… [--timeout]`                                                                                         |
+| `emulate`     | Emulate device, color scheme, location, network | `[--viewport] [--device-scale-factor] [--color-scheme] [--user-agent] [--geolocation] [--cpu-throttling] [--network-conditions]` |
+| `console`     | Deduplicated errors and warnings since launch   | `[--all]`                                                                                                     |
+| `network`     | Failed requests since launch                    | `[--all]`                                                                                                     |
+| `pages`       | List tabs, `*` marks the selected one           |                                                                                                               |
+| `new-page`    | Open and select a tab                           | `<url> [--background] [--isolated-context]`                                                                   |
+| `oneshot`     | Launch, capture, and close                      | `snapshot\|screenshot <url>` plus snapshot and screenshot flags                                               |
+| `daemon-*`    | `daemon-start`, `daemon-status`, `daemon-stop`  |                                                                                                               |
 
 ## Key Rules
 
-- Always pass `--timeout` on `navigate` (default: 10000)
-- Get uids from `snapshot` before interacting — uids come from the accessibility tree
-- Use `--session <id>` for a browser started by `launch`.
-- Use `--port <port>` instead for external Chrome with a local debugging port.
-- `eval --args` takes JSON array of `{"uid":"<id>"}` objects to pass elements to the expression
-- `fill-form --fields` takes a JSON string array of `{"uid":"<id>","value":"<text>"}` objects
-- `wait --text` accepts comma-separated values, resolves when any appears
-- `emulate --viewport` format is `WxH` (e.g., `375x812`)
-- `emulate --geolocation` format is `lat,lng`
-- Screenshots save to file with `--path`, otherwise return base64
-- Network/console capture must be explicitly started before listing
+- Pass `-s <id>` for a launched browser or `--port <port>` for an external Chrome.
+- Targets are a uid from `snapshot` or a role and name such as `'button "Save"'`.
+- Ambiguous targets fail with every matching uid, so pass one of them.
+- Actions wait for navigation, network idle, and a quiet DOM.
+- `--no-wait` returns right after the action.
+- Add `--wait-for <text>`, `--snapshot`, or `--screenshot` to any action instead of a follow-up command.
+- Dialogs are accepted automatically and their text appears in the action output.
+- `navigate` retries refused connections until `--timeout`, so start the dev server and navigate without polling.
+- `--viewport` takes `mobile` (390x844, touch), `desktop` (1440x900), or `WxH`.
+- `screenshot` writes to `$TMPDIR/chrome-cli/<session>/` unless `--path` is set.
+- Add `--json` before the command for machine-readable output.
+- On Linux, `kill-all --include-orphans` stops every chrome-cli daemon and browser of the current user, including other agents' sessions.

@@ -26,44 +26,38 @@ chrome-cli.url = "github:jruz/chrome-cli";
 
 ### Pre-built binaries
 
-Download from [GitHub releases](https://github.com/jruz/chrome-cli/releases).
+Download a static binary from [GitHub releases](https://github.com/jruz/chrome-cli/releases).
 
 ## Usage
 
 ```bash
-# launch a headless Chrome instance (requires jq for this example)
-session=$(chrome-cli launch | jq -r .session)
+# launch a headless Chrome and load a page
+s=$(chrome-cli launch --url http://localhost:3000)
 
-# navigate to a URL
-chrome-cli navigate --session "$session" --url https://example.com --timeout 10000
+# read the accessibility tree with element uids
+chrome-cli snapshot -s "$s"
 
-# take an accessibility snapshot
-chrome-cli snapshot --session "$session"
+# act by role and name, waiting for the result
+chrome-cli click -s "$s" 'button "Save"' --wait-for Saved
+chrome-cli fill-form -s "$s" 'Email=a@b.com' 'Password=secret' --submit 'button "Sign in"'
 
-# take a screenshot
-chrome-cli screenshot --session "$session" --format png --path screenshot.png
+# capture screenshots across viewports and color schemes
+chrome-cli screenshot -s "$s" --viewport mobile,desktop --color-scheme light,dark
 
-# interact with elements (by uid from snapshot)
-chrome-cli click --session "$session" --uid 5
-chrome-cli fill --session "$session" --uid 3 --value "hello"
-chrome-cli type --session "$session" --text "search query" --submit-key Enter
+# inspect problems since launch
+chrome-cli console -s "$s"
+chrome-cli network -s "$s"
 
 # evaluate JavaScript
-chrome-cli eval --session "$session" --expression "document.title"
+chrome-cli eval -s "$s" "document.title"
 
-# manage pages
-chrome-cli pages --session "$session"
-chrome-cli new-page --session "$session" --url https://example.com
-chrome-cli close-page --session "$session" --page-id <id>
-
-# kill the instance
-chrome-cli kill --session "$session"
+# close the browser
+chrome-cli kill -s "$s"
 ```
 
-`launch` returns `{ "session": "<id>" }`. Pass that ID with `--session`.
+Add `--json` before any command for machine-readable output.
 
-To control a Chrome you started with a local remote-debugging port, use `--port <port>` instead.
-Browser commands require exactly one of these flags.
+To control a Chrome you started with a local remote-debugging port, use `--port <port>` instead of `-s`.
 
 ### Stop Chrome sessions
 
@@ -71,32 +65,24 @@ Browser commands require exactly one of these flags.
 - `chrome-cli daemon-stop` also stops the current daemon.
 
 On Linux, pause agents before running `chrome-cli kill-all --include-orphans`.
-The flag stops your Chrome CLI daemons and their browsers even if the socket is dead.
+The flag stops your chrome-cli daemons and their browsers even if the socket is dead.
 
 ## How it works
 
-A long-lived daemon runs on a Unix socket (`/tmp/chrome-cli-<uid>/daemon.sock`). The CLI sends JSON commands to the daemon, which manages Chrome sessions via puppeteer-core. The daemon starts automatically on first use.
-
-The daemon holds an exclusive lock on `daemon.lock` in the same private directory. Concurrent cold starts share the daemon that wins the lock.
-
-### Upgrading from `/tmp/chrome-cli.sock`
-
-Run `chrome-cli daemon-stop` with the old binary before installing.
-A daemon left on the old socket can be stopped with `chrome-cli kill-all --include-orphans` on Linux.
-
 ```
-CLI → Unix socket → Daemon → CDP → Chrome
+CLI → Unix socket → Daemon → CDP pipe → Chrome
 ```
 
-The daemon uses a private CDP pipe for each browser it launches. These browsers do not expose a debugging port.
+A long-lived daemon runs on a Unix socket (`/tmp/chrome-cli-<uid>/daemon.sock`) and starts automatically on first use.
+It holds an exclusive lock on `daemon.lock` in the same private directory, so concurrent cold starts share one daemon.
+Logs go to `daemon.log` in that directory.
 
-The daemon owns at most 8 browsers, counting `launch` and `oneshot` launches in progress.
-A launch over the limit fails until `kill` or `kill-all` closes a browser.
+The daemon owns each browser it launches through a private CDP pipe, so these browsers expose no debugging port.
+It owns at most 8 browsers, counting launches in progress.
 
-The daemon closes browsers it launched after 30 minutes without a command, unless a command is still running.
+Browsers idle for 30 minutes are closed unless a command is still running.
 `SIGTERM` and `SIGINT` close tracked browsers before the daemon exits.
-
-If the daemon is killed with `SIGKILL`, Chrome exits when the pipe closes. The temporary profile can remain on disk.
+After a `SIGKILL`, Chrome exits when the pipe closes, and its temporary profile can remain on disk.
 
 ## Claude Code skill
 
@@ -108,7 +94,7 @@ cp -r skills/chrome ~/.claude/skills/
 
 ## AI disclaimer
 
-This project was built with the assistance of Claude Code. All code adheres to strict my own quality standards and is enforced by the [Oxlint configuration](.oxlintrc.json) and [slop-detector](https://github.com/jruz/slop-detector).
+This project was built with the assistance of Claude Code. All code adheres to my own strict quality standards, enforced by gofmt, go vet, staticcheck, and [slop-detector](https://github.com/jruz/slop-detector).
 
 ## License
 
