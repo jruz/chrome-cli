@@ -12,8 +12,11 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        inherit (builtins.fromJSON (builtins.readFile ./package.json)) engines;
+        projectName = "chrome-cli";
         goVersion = builtins.head (builtins.match ".*\ngo ([^\n]+)\n.*" (builtins.readFile ./go.mod));
+        release = builtins.fromJSON (builtins.readFile ./release.json);
+        platform = release.platforms.${system};
+        released = release.platforms ? ${system};
         sandbox = pkgs.writeShellScriptBin "sandbox" ''
           export PATH=${
             pkgs.lib.makeBinPath [
@@ -24,25 +27,46 @@
           }:"$PATH"
           exec ${pkgs.nushell}/bin/nu ${./scripts/sandbox.nu} "$@"
         '';
-        defaultPackages = with pkgs; [
-          just
-          nushell
-          sandbox
-        ];
       in
       {
+        packages = pkgs.lib.optionalAttrs released {
+          default = pkgs.stdenvNoCC.mkDerivation {
+            pname = projectName;
+            inherit (release) version;
+            src = pkgs.fetchurl {
+              url = "https://github.com/jruz/${projectName}/releases/download/v${release.version}/${platform.asset}";
+              inherit (platform) hash;
+            };
+            dontUnpack = true;
+            dontStrip = true;
+            installPhase = ''
+              runHook preInstall
+              install -Dm755 "$src" "$out/bin/${projectName}"
+              install -Dm644 ${./LICENSE} "$out/share/licenses/${projectName}/LICENSE"
+              runHook postInstall
+            '';
+            meta = {
+              mainProgram = projectName;
+              license = pkgs.lib.licenses.eupl12;
+              platforms = builtins.attrNames release.platforms;
+            };
+          };
+        };
+
         devShells.default = pkgs.mkShell {
-          packages = defaultPackages;
-          CHROME_CLI_NATIVE_BUN = "${pkgs.bun}/bin/bun";
+          packages = with pkgs; [
+            gh
+            git
+            just
+            nushell
+            sandbox
+          ];
 
           shellHook = ''
             echo ""
             echo "  chrome-cli Development Shell"
             echo "  ──────────────────────"
             echo "  nixpkgs      ${pkgs.lib.trivial.release}"
-            echo "  node         ${engines.node} (docker)"
-            echo "  pnpm         ${engines.pnpm} (docker)"
-            echo "  bun          ${engines.bun} (docker)"
             echo "  go           ${goVersion} (docker)"
             echo ""
           '';

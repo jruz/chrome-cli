@@ -1,6 +1,0 @@
-minimumReleaseAge: 10080
-allowBuilds:
-  core-js-pure: false
-  dtrace-provider: false
-  protobufjs: false
-  re2: false

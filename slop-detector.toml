@@ -1,7 +1,3 @@
 [ignore]
 rules = []
 files = []
-
-[ignore.by-rule]
-no-for-loop = ["bench.ts", "src/browser.ts", "src/registry.ts"]
-no-interface = ["src/env.d.ts"]
